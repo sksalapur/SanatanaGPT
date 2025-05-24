@@ -623,11 +623,8 @@ def main():
         config['cookie']['expiry_days']
     )
     
-    # Authentication widget
-    try:
-        authenticator.login(location='main')
-    except Exception as e:
-        st.error(e)
+    # Login
+    authenticator.login(location='main')
     
     # Get authentication status from session state
     name = st.session_state.get('name')
