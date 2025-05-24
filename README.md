@@ -53,12 +53,37 @@ Then open your browser to `http://localhost:8501`
 
 ```
 SanatanaGPT/
-├── app.py              # Main Streamlit application
-├── requirements.txt    # Python dependencies
-├── .env               # Your Google API key (create this)
-├── hindu_texts/       # Your scripture text files
-└── README.md          # This file
+├── app.py                          # Main Streamlit application
+├── requirements.txt                # Python dependencies
+├── .env                           # Your Google API key (create this)
+├── README.md                      # This file
+├── .gitignore                     # Git ignore rules
+│
+├── hindu_texts/                   # Your scripture text files
+│   ├── sample_bhagavad_gita.txt
+│   ├── sample_upanishads.txt
+│   └── ... (add your .txt files here)
+│
+├── config/                        # Configuration files
+│   ├── env_example.txt           # Environment template
+│   ├── secrets_template.toml     # Streamlit secrets template
+│   └── .streamlit/               # Streamlit configuration
+│       └── config.toml
+│
+├── scripts/                       # Utility scripts
+│   ├── setup.py                 # Automated setup script
+│   └── text_processor.py        # Text processing utilities
+│
+└── docs/                         # Documentation
+    ├── INSTALLATION.md           # Detailed installation guide
+    └── API_GUIDE.md             # Google Gemini API guide
 ```
+
+## 📚 Documentation
+
+- **[📖 Installation Guide](docs/INSTALLATION.md)** - Complete setup instructions
+- **[🤖 API Guide](docs/API_GUIDE.md)** - Google Gemini integration details
+- **[🔧 Text Processing](scripts/text_processor.py)** - Utilities for scripture files
 
 ## 💡 Usage Examples
 
@@ -88,23 +113,38 @@ SanatanaGPT/
 - **Search**: Keyword-based passage retrieval
 - **Caching**: Streamlit caching for fast performance
 
+## ☁️ Streamlit Cloud Deployment
+
+Deploy your app to Streamlit Cloud for free:
+
+1. **Push to GitHub** (this repository)
+2. **Go to [share.streamlit.io](https://share.streamlit.io)**
+3. **Connect your GitHub account**
+4. **Deploy the app** using `app.py`
+5. **Add your Google API key** in App Settings → Secrets
+
+**Detailed deployment guide**: [docs/INSTALLATION.md](docs/INSTALLATION.md)
+
+## 🔧 Utility Scripts
+
+### Automated Setup
+```bash
+python scripts/setup.py
+```
+Automatically installs dependencies, creates config files, and sets up the project.
+
+### Text Processing
+```bash
+python scripts/text_processor.py
+```
+Analyzes your Hindu scripture files and generates processing reports.
+
 ## 📋 Requirements
 
 - Python 3.8+
 - Google API key (free tier available)
 - Internet connection for AI API calls
 - Hindu scripture text files (.txt format)
-
-## 🔧 Configuration
-
-### Adjustable Settings (in the app sidebar):
-
-- **Number of passages**: Control how many text passages to analyze (1-5)
-- More passages = more context but slower responses
-
-### Environment Variables:
-
-- `GOOGLE_API_KEY`: Your Google AI API key (required)
 
 ## 🎯 Tips for Best Results
 
@@ -125,14 +165,11 @@ SanatanaGPT/
    - Add Hindu scripture text files to the `hindu_texts/` directory
    - Make sure files have `.txt` extension
 
-3. **"No relevant passages found"**
-   - Try rephrasing your question
-   - Use different keywords
-   - Check if your text files contain relevant content
+3. **Import Errors**
+   - Run `python scripts/setup.py` for automated setup
+   - Or manually: `pip install -r requirements.txt`
 
-4. **Import Errors**
-   - Run `pip install -r requirements.txt`
-   - Make sure you're using Python 3.8+
+**Full troubleshooting guide**: [docs/INSTALLATION.md](docs/INSTALLATION.md)
 
 ## 🙏 Acknowledgments
 
