@@ -191,4 +191,14 @@ If you encounter issues with the authentication system:
 
 ---
 
-**🕉️ Enjoy your personalized journey through Hindu wisdom with SanatanaGPT! 🕉️** 
+**🕉️ Enjoy your personalized journey through Hindu wisdom with SanatanaGPT! 🕉️**
+
+## 🔧 Recent Updates
+
+### Authentication API Fix (Latest)
+- **Issue**: Fixed compatibility with `streamlit-authenticator` v0.4.2
+- **Problem**: API changes in the library caused startup failures
+- **Solution**: Updated password hashing to use new `Hasher.hash_passwords()` static method
+- **Status**: ✅ Resolved - App now works on both local and Streamlit Cloud deployments
+
+For detailed technical information about this fix, see `AUTHENTICATION_FIX.md`. 
