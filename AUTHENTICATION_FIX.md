@@ -64,9 +64,23 @@ authenticator = stauth.Authenticate(
     config['cookie']['expiry_days']
 )
 
-# New login/logout calls with keyword arguments
-name, authentication_status, username = authenticator.login(location='main')
-authenticator.logout(location='main')
+# New login/logout calls with keyword arguments and session state
+try:
+    authenticator.login(location='main')
+except Exception as e:
+    st.error(e)
+
+# Get authentication status from session state
+name = st.session_state.get('name')
+authentication_status = st.session_state.get('authentication_status')
+username = st.session_state.get('username')
+
+# Logout with error handling
+try:
+    authenticator.logout(location='main')
+    st.rerun()
+except Exception as e:
+    st.error(e)
 ```
 
 ## Files Modified
@@ -89,8 +103,10 @@ authenticator.logout(location='main')
 
 ### main() Function
 - Removed the deprecated `config['preauthorized']` parameter from `stauth.Authenticate()` constructor
-- Updated `authenticator.login()` to use `location='main'` keyword argument
-- Updated `authenticator.logout()` to use `location='main'` keyword argument
+- Updated `authenticator.login()` to use `location='main'` keyword argument and wrapped in try-catch
+- Updated `authenticator.logout()` to use `location='main'` keyword argument and wrapped in try-catch
+- Changed login flow to use session state variables instead of return values
+- Added proper error handling for authentication methods
 - The preauthorized functionality is now handled directly in the `register_user` widget
 
 ## Testing
@@ -98,7 +114,9 @@ authenticator.logout(location='main')
 - ✅ Password hashing: Verified bcrypt hashes are generated
 - ✅ Configuration files: `users_config.yaml` created with hashed passwords
 - ✅ Authenticate class: Instantiation works without deprecated parameters
-- ✅ Login/logout: Methods work with new keyword argument format
+- ✅ Login/logout: Methods work with new keyword argument format and session state
+- ✅ Session state: Authentication info properly stored and retrieved
+- ✅ Error handling: Proper try-catch blocks for authentication methods
 - ✅ Deployment: Changes pushed to GitHub for Streamlit Cloud
 
 ## Default Credentials
