@@ -41,16 +41,14 @@ def save_user_data(user_data):
 def create_users_config():
     """Create initial users configuration file."""
     if not os.path.exists(USERS_CONFIG_FILE):
-        # Create default admin user
-        hashed_passwords = stauth.Hasher().generate(['admin123'])
-        
+        # Create default admin user with plain text password
         config = {
             'credentials': {
                 'usernames': {
                     'admin': {
                         'email': 'admin@sanatanagpt.com',
                         'name': 'Administrator',
-                        'password': hashed_passwords[0]
+                        'password': 'admin123'  # Will be hashed automatically
                     }
                 }
             },
@@ -63,6 +61,9 @@ def create_users_config():
                 'emails': []
             }
         }
+        
+        # Hash the passwords
+        stauth.Hasher.hash_passwords(config['credentials'])
         
         with open(USERS_CONFIG_FILE, 'w') as f:
             yaml.dump(config, f, default_flow_style=False)
@@ -96,15 +97,15 @@ def register_new_user(username, name, email, password):
     if username in config['credentials']['usernames']:
         return False, "Username already exists"
     
-    # Hash password
-    hashed_password = stauth.Hasher().generate([password])[0]
-    
-    # Add new user
+    # Add new user with plain text password
     config['credentials']['usernames'][username] = {
         'email': email,
         'name': name,
-        'password': hashed_password
+        'password': password  # Will be hashed automatically
     }
+    
+    # Hash all passwords in the credentials
+    stauth.Hasher.hash_passwords(config['credentials'])
     
     # Save configuration
     save_users_config(config)
