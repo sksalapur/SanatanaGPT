@@ -749,21 +749,6 @@ def main():
     elif authentication_status == None:
         st.warning('Please enter your username and password')
         
-        # Debug information
-        with st.expander("🔧 Debug Information"):
-            admin_test, admin_msg = test_admin_credentials()
-            if admin_test:
-                st.success(f"✅ {admin_msg}")
-                st.info("**Admin Login:** Username: `admin`, Password: `admin123`")
-            else:
-                st.error(f"❌ {admin_msg}")
-            
-            # Show available users
-            init_persistent_storage()
-            st.write("**Available users:**")
-            for username, user_info in st.session_state.persistent_users.items():
-                st.write(f"• **{username}** - {user_info['name']} ({user_info['email']})")
-        
         # Show registration option
         st.markdown("---")
         st.info("Don't have an account? Create one below with email verification!")
@@ -980,7 +965,6 @@ def main():
             # User info - protect against KeyError during logout
             st.markdown("---")
             st.markdown(f"**👤 Logged in as:** {name}")
-            st.markdown(f"**🔑 Username:** {username}")  # Debug info
             try:
                 user_email = config['credentials']['usernames'][username]['email']
                 st.markdown(f"**📧 Email:** {user_email}")
@@ -988,17 +972,10 @@ def main():
                 # Handle case where user data is being cleared during logout
                 st.markdown("**📧 Email:** Logging out...")
             
-            # Debug: Show if user is admin
-            if username == 'admin':
-                st.success("🔧 **Admin Access Detected!**")
-            else:
-                st.info(f"👤 **Regular User:** {username}")
-            
             # Admin panel for admin users
             if username == 'admin':
                 st.markdown("---")
-                st.header("🔧 Admin Panel")
-                st.markdown("**🎯 You have administrative privileges!**")
+                st.header("⚙️ Management")
                 
                 # User statistics
                 try:
