@@ -6,5 +6,11 @@ pathlib
 streamlit-authenticator
 pyyaml
 
+# Email functionality for OTP verification
+smtplib
+email-validator
+random
+datetime
+
 # Optional: For future PDF support
 pypdf>=3.0.0 

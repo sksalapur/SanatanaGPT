@@ -11,6 +11,12 @@ import yaml
 from yaml.loader import SafeLoader
 import pickle
 import hashlib
+import smtplib
+import random
+import string
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.validator import validate_email, EmailNotValidError
 
 # Load environment variables
 load_dotenv()
@@ -110,6 +116,113 @@ def register_new_user(username, name, email, password):
     # Save configuration
     save_users_config(config)
     return True, "User registered successfully!"
+
+def generate_otp():
+    """Generate a 6-digit OTP."""
+    return ''.join(random.choices(string.digits, k=6))
+
+def send_otp_email(email, otp, name):
+    """Send OTP via email."""
+    try:
+        # Email configuration - you'll need to set these in your .env file or Streamlit secrets
+        smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+        smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        sender_email = os.getenv("SENDER_EMAIL")
+        sender_password = os.getenv("SENDER_PASSWORD")
+        
+        # Check if email credentials are configured
+        if not sender_email or not sender_password:
+            return False, "Email service not configured. Please contact administrator."
+        
+        # Create message
+        message = MIMEMultipart()
+        message["From"] = sender_email
+        message["To"] = email
+        message["Subject"] = "🕉️ SanatanaGPT - Email Verification Code"
+        
+        # Email body
+        body = f"""
+        🙏 Namaste {name}!
+        
+        Welcome to SanatanaGPT - Your Personal Guide to Hindu Wisdom!
+        
+        Your email verification code is: {otp}
+        
+        This code will expire in 10 minutes for security purposes.
+        
+        If you didn't request this verification, please ignore this email.
+        
+        🕉️ May your journey through Hindu scriptures bring you wisdom and peace.
+        
+        With blessings,
+        The SanatanaGPT Team
+        """
+        
+        message.attach(MIMEText(body, "plain"))
+        
+        # Send email
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.send_message(message)
+        
+        return True, "OTP sent successfully!"
+        
+    except Exception as e:
+        return False, f"Failed to send email: {str(e)}"
+
+def validate_email_format(email):
+    """Validate email format."""
+    try:
+        validate_email(email)
+        return True, "Valid email"
+    except EmailNotValidError:
+        return False, "Invalid email format"
+
+def store_pending_user(username, name, email, password, otp):
+    """Store user data temporarily until OTP verification."""
+    if 'pending_users' not in st.session_state:
+        st.session_state.pending_users = {}
+    
+    st.session_state.pending_users[email] = {
+        'username': username,
+        'name': name,
+        'email': email,
+        'password': password,
+        'otp': otp,
+        'timestamp': time.time()
+    }
+
+def verify_otp_and_register(email, entered_otp):
+    """Verify OTP and register user if valid."""
+    if 'pending_users' not in st.session_state or email not in st.session_state.pending_users:
+        return False, "No pending registration found for this email"
+    
+    pending_user = st.session_state.pending_users[email]
+    
+    # Check if OTP has expired (10 minutes)
+    if time.time() - pending_user['timestamp'] > 600:
+        del st.session_state.pending_users[email]
+        return False, "OTP has expired. Please register again."
+    
+    # Verify OTP
+    if entered_otp != pending_user['otp']:
+        return False, "Invalid OTP. Please try again."
+    
+    # Register the user
+    success, message = register_new_user(
+        pending_user['username'],
+        pending_user['name'],
+        pending_user['email'],
+        pending_user['password']
+    )
+    
+    if success:
+        # Clean up pending user data
+        del st.session_state.pending_users[email]
+        return True, "Account created successfully! You can now login."
+    else:
+        return False, f"Registration failed: {message}"
 
 # Page configuration
 st.set_page_config(
@@ -416,65 +529,235 @@ def main():
     if authentication_status == False:
         st.error('Username/password is incorrect')
         
-        # Registration section
+        # Registration section with OTP verification
         st.markdown("---")
         st.subheader("🆕 Create New Account")
         
-        with st.form("registration_form"):
-            new_username = st.text_input("Username")
-            new_name = st.text_input("Full Name")
-            new_email = st.text_input("Email")
-            new_password = st.text_input("Password", type="password")
-            confirm_password = st.text_input("Confirm Password", type="password")
+        # Check if we're in OTP verification mode
+        if 'otp_verification_email' in st.session_state:
+            # OTP Verification Form
+            st.info(f"📧 We've sent a verification code to **{st.session_state.otp_verification_email}**")
+            st.markdown("Please check your email and enter the 6-digit code below:")
             
-            if st.form_submit_button("Register"):
-                if not all([new_username, new_name, new_email, new_password]):
-                    st.error("Please fill in all fields")
-                elif new_password != confirm_password:
-                    st.error("Passwords do not match")
-                elif len(new_password) < 6:
-                    st.error("Password must be at least 6 characters long")
-                else:
-                    success, message = register_new_user(new_username, new_name, new_email, new_password)
-                    if success:
-                        st.success(message)
-                        st.info("Please login with your new credentials")
-                        st.rerun()
+            with st.form("otp_verification_form"):
+                entered_otp = st.text_input("Enter 6-digit verification code", max_chars=6, placeholder="123456")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.form_submit_button("✅ Verify & Create Account", use_container_width=True, type="primary"):
+                        if not entered_otp:
+                            st.error("Please enter the verification code")
+                        elif len(entered_otp) != 6 or not entered_otp.isdigit():
+                            st.error("Please enter a valid 6-digit code")
+                        else:
+                            success, message = verify_otp_and_register(st.session_state.otp_verification_email, entered_otp)
+                            if success:
+                                st.success(message)
+                                # Clear OTP verification state
+                                del st.session_state.otp_verification_email
+                                st.info("You can now login with your new credentials")
+                                time.sleep(2)
+                                st.rerun()
+                            else:
+                                st.error(message)
+                
+                with col2:
+                    if st.form_submit_button("🔄 Resend Code", use_container_width=True):
+                        if st.session_state.otp_verification_email in st.session_state.get('pending_users', {}):
+                            pending_user = st.session_state.pending_users[st.session_state.otp_verification_email]
+                            new_otp = generate_otp()
+                            
+                            # Update OTP and timestamp
+                            pending_user['otp'] = new_otp
+                            pending_user['timestamp'] = time.time()
+                            
+                            # Send new OTP
+                            success, message = send_otp_email(pending_user['email'], new_otp, pending_user['name'])
+                            if success:
+                                st.success("New verification code sent!")
+                            else:
+                                st.error(message)
+                        else:
+                            st.error("Registration session expired. Please register again.")
+                            del st.session_state.otp_verification_email
+                            st.rerun()
+            
+            # Option to go back to registration
+            if st.button("⬅️ Back to Registration"):
+                if st.session_state.otp_verification_email in st.session_state.get('pending_users', {}):
+                    del st.session_state.pending_users[st.session_state.otp_verification_email]
+                del st.session_state.otp_verification_email
+                st.rerun()
+        
+        else:
+            # Registration Form
+            with st.form("registration_form"):
+                new_username = st.text_input("Username", placeholder="Choose a unique username")
+                new_name = st.text_input("Full Name", placeholder="Your full name")
+                new_email = st.text_input("Email", placeholder="your.email@example.com")
+                new_password = st.text_input("Password", type="password", placeholder="Minimum 6 characters")
+                confirm_password = st.text_input("Confirm Password", type="password", placeholder="Re-enter your password")
+                
+                if st.form_submit_button("📧 Send Verification Code", use_container_width=True, type="primary"):
+                    if not all([new_username, new_name, new_email, new_password]):
+                        st.error("Please fill in all fields")
+                    elif new_password != confirm_password:
+                        st.error("Passwords do not match")
+                    elif len(new_password) < 6:
+                        st.error("Password must be at least 6 characters long")
                     else:
-                        st.error(message)
+                        # Validate email format
+                        email_valid, email_message = validate_email_format(new_email)
+                        if not email_valid:
+                            st.error(email_message)
+                        else:
+                            # Check if username or email already exists
+                            config = load_users_config()
+                            if config and new_username in config['credentials']['usernames']:
+                                st.error("Username already exists")
+                            elif config:
+                                # Check if email already exists
+                                email_exists = False
+                                for user_data in config['credentials']['usernames'].values():
+                                    if user_data.get('email', '').lower() == new_email.lower():
+                                        email_exists = True
+                                        break
+                                
+                                if email_exists:
+                                    st.error("Email already registered")
+                                else:
+                                    # Generate and send OTP
+                                    otp = generate_otp()
+                                    success, message = send_otp_email(new_email, otp, new_name)
+                                    
+                                    if success:
+                                        # Store pending user data
+                                        store_pending_user(new_username, new_name, new_email, new_password, otp)
+                                        st.session_state.otp_verification_email = new_email
+                                        st.success("Verification code sent to your email!")
+                                        st.rerun()
+                                    else:
+                                        st.error(message)
+                            else:
+                                st.error("Error loading configuration")
         
     elif authentication_status == None:
         st.warning('Please enter your username and password')
         
         # Show registration option
         st.markdown("---")
-        st.info("Don't have an account? Fill in the login form above and click 'Create New Account' below")
+        st.info("Don't have an account? Create one below with email verification!")
         
-        # Registration section
+        # Registration section with OTP verification
         st.subheader("🆕 Create New Account")
         
-        with st.form("registration_form"):
-            new_username = st.text_input("Username")
-            new_name = st.text_input("Full Name")
-            new_email = st.text_input("Email")
-            new_password = st.text_input("Password", type="password")
-            confirm_password = st.text_input("Confirm Password", type="password")
+        # Check if we're in OTP verification mode
+        if 'otp_verification_email' in st.session_state:
+            # OTP Verification Form
+            st.info(f"📧 We've sent a verification code to **{st.session_state.otp_verification_email}**")
+            st.markdown("Please check your email and enter the 6-digit code below:")
             
-            if st.form_submit_button("Create New Account"):
-                if not all([new_username, new_name, new_email, new_password]):
-                    st.error("Please fill in all fields")
-                elif new_password != confirm_password:
-                    st.error("Passwords do not match")
-                elif len(new_password) < 6:
-                    st.error("Password must be at least 6 characters long")
-                else:
-                    success, message = register_new_user(new_username, new_name, new_email, new_password)
-                    if success:
-                        st.success(message)
-                        st.info("Please login with your new credentials")
-                        st.rerun()
+            with st.form("otp_verification_form_none"):
+                entered_otp = st.text_input("Enter 6-digit verification code", max_chars=6, placeholder="123456")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.form_submit_button("✅ Verify & Create Account", use_container_width=True, type="primary"):
+                        if not entered_otp:
+                            st.error("Please enter the verification code")
+                        elif len(entered_otp) != 6 or not entered_otp.isdigit():
+                            st.error("Please enter a valid 6-digit code")
+                        else:
+                            success, message = verify_otp_and_register(st.session_state.otp_verification_email, entered_otp)
+                            if success:
+                                st.success(message)
+                                # Clear OTP verification state
+                                del st.session_state.otp_verification_email
+                                st.info("You can now login with your new credentials")
+                                time.sleep(2)
+                                st.rerun()
+                            else:
+                                st.error(message)
+                
+                with col2:
+                    if st.form_submit_button("🔄 Resend Code", use_container_width=True):
+                        if st.session_state.otp_verification_email in st.session_state.get('pending_users', {}):
+                            pending_user = st.session_state.pending_users[st.session_state.otp_verification_email]
+                            new_otp = generate_otp()
+                            
+                            # Update OTP and timestamp
+                            pending_user['otp'] = new_otp
+                            pending_user['timestamp'] = time.time()
+                            
+                            # Send new OTP
+                            success, message = send_otp_email(pending_user['email'], new_otp, pending_user['name'])
+                            if success:
+                                st.success("New verification code sent!")
+                            else:
+                                st.error(message)
+                        else:
+                            st.error("Registration session expired. Please register again.")
+                            del st.session_state.otp_verification_email
+                            st.rerun()
+            
+            # Option to go back to registration
+            if st.button("⬅️ Back to Registration", key="back_to_reg_none"):
+                if st.session_state.otp_verification_email in st.session_state.get('pending_users', {}):
+                    del st.session_state.pending_users[st.session_state.otp_verification_email]
+                del st.session_state.otp_verification_email
+                st.rerun()
+        
+        else:
+            # Registration Form
+            with st.form("registration_form_none"):
+                new_username = st.text_input("Username", placeholder="Choose a unique username")
+                new_name = st.text_input("Full Name", placeholder="Your full name")
+                new_email = st.text_input("Email", placeholder="your.email@example.com")
+                new_password = st.text_input("Password", type="password", placeholder="Minimum 6 characters")
+                confirm_password = st.text_input("Confirm Password", type="password", placeholder="Re-enter your password")
+                
+                if st.form_submit_button("📧 Send Verification Code", use_container_width=True, type="primary"):
+                    if not all([new_username, new_name, new_email, new_password]):
+                        st.error("Please fill in all fields")
+                    elif new_password != confirm_password:
+                        st.error("Passwords do not match")
+                    elif len(new_password) < 6:
+                        st.error("Password must be at least 6 characters long")
                     else:
-                        st.error(message)
+                        # Validate email format
+                        email_valid, email_message = validate_email_format(new_email)
+                        if not email_valid:
+                            st.error(email_message)
+                        else:
+                            # Check if username or email already exists
+                            config = load_users_config()
+                            if config and new_username in config['credentials']['usernames']:
+                                st.error("Username already exists")
+                            elif config:
+                                # Check if email already exists
+                                email_exists = False
+                                for user_data in config['credentials']['usernames'].values():
+                                    if user_data.get('email', '').lower() == new_email.lower():
+                                        email_exists = True
+                                        break
+                                
+                                if email_exists:
+                                    st.error("Email already registered")
+                                else:
+                                    # Generate and send OTP
+                                    otp = generate_otp()
+                                    success, message = send_otp_email(new_email, otp, new_name)
+                                    
+                                    if success:
+                                        # Store pending user data
+                                        store_pending_user(new_username, new_name, new_email, new_password, otp)
+                                        st.session_state.otp_verification_email = new_email
+                                        st.success("Verification code sent to your email!")
+                                        st.rerun()
+                                    else:
+                                        st.error(message)
+                            else:
+                                st.error("Error loading configuration")
         
     elif authentication_status:
         # User is authenticated - show the main app
@@ -506,9 +789,10 @@ def main():
             if st.button("🚪 Logout"):
                 try:
                     authenticator.logout(location='main')
-                    st.rerun()
                 except Exception as e:
                     st.error(e)
+                # Always rerun after logout attempt
+                st.rerun()
         
         # Setup Gemini
         model = setup_gemini()
