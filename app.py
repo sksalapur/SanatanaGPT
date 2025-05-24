@@ -41,23 +41,11 @@ def init_persistent_storage():
             if hasattr(st, 'secrets') and 'users' in st.secrets:
                 st.session_state.persistent_users = dict(st.secrets['users'])
             else:
-                # Default admin user if no secrets configured
-                st.session_state.persistent_users = {
-                    'sksalapur': {
-                        'email': 'sksalapur@gmail.com',
-                        'name': 'Administrator',
-                        'password': 'sksalapur'  # Will be hashed
-                    }
-                }
+                # Start with empty users - no default admin
+                st.session_state.persistent_users = {}
         except Exception:
-            # Fallback to default admin
-            st.session_state.persistent_users = {
-                'sksalapur': {
-                    'email': 'sksalapur@gmail.com',
-                    'name': 'Administrator',
-                    'password': 'sksalapur'  # Will be hashed
-                }
-            }
+            # Fallback to empty users
+            st.session_state.persistent_users = {}
     
     if 'persistent_user_data' not in st.session_state:
         st.session_state.persistent_user_data = {}
@@ -561,51 +549,6 @@ def update_current_conversation(chat_history, conversation_context):
     st.session_state.conversations[st.session_state.current_conversation_id]['chat_history'] = chat_history
     st.session_state.conversations[st.session_state.current_conversation_id]['conversation_context'] = conversation_context
 
-def export_user_data():
-    """Export user data as JSON for backup."""
-    init_persistent_storage()
-    export_data = {
-        'users': st.session_state.persistent_users,
-        'user_data': st.session_state.persistent_user_data,
-        'export_timestamp': time.time()
-    }
-    return export_data
-
-def import_user_data(import_data):
-    """Import user data from JSON backup."""
-    try:
-        init_persistent_storage()
-        if 'users' in import_data:
-            st.session_state.persistent_users.update(import_data['users'])
-        if 'user_data' in import_data:
-            st.session_state.persistent_user_data.update(import_data['user_data'])
-        return True, "Data imported successfully!"
-    except Exception as e:
-        return False, f"Import failed: {str(e)}"
-
-def test_admin_credentials():
-    """Test if admin credentials are properly set up."""
-    try:
-        init_persistent_storage()
-        admin_user = st.session_state.persistent_users.get('sksalapur')
-        if admin_user:
-            return True, f"Admin user found: {admin_user['name']} ({admin_user['email']})"
-        else:
-            return False, "Admin user not found in persistent storage"
-    except Exception as e:
-        return False, f"Error testing admin credentials: {e}"
-
-def get_user_stats():
-    """Get statistics about registered users and conversations."""
-    init_persistent_storage()
-    total_users = len(st.session_state.persistent_users)
-    total_conversations = sum(len(user_data.get('conversations', {})) for user_data in st.session_state.persistent_user_data.values())
-    return {
-        'total_users': total_users,
-        'total_conversations': total_conversations,
-        'users': list(st.session_state.persistent_users.keys())
-    }
-
 def main():
     """Main Streamlit application with user authentication."""
     
@@ -971,126 +914,6 @@ def main():
             except (KeyError, TypeError):
                 # Handle case where user data is being cleared during logout
                 st.markdown("**📧 Email:** Logging out...")
-            
-            # Admin panel for admin users
-            if username == 'sksalapur':
-                st.markdown("---")
-                st.header("⚙️ Management")
-                
-                # User statistics
-                try:
-                    stats = get_user_stats()
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("👥 Total Users", stats['total_users'])
-                    with col2:
-                        st.metric("💬 Total Conversations", stats['total_conversations'])
-                    
-                    # Show registered users
-                    with st.expander("👥 Registered Users", expanded=True):
-                        st.markdown("**All registered users:**")
-                        
-                        # Debug information
-                        st.markdown("**Debug Info:**")
-                        st.write(f"• Total users in persistent_users: {len(st.session_state.persistent_users)}")
-                        st.write(f"• Users list from stats: {stats['users']}")
-                        st.write(f"• Raw persistent_users keys: {list(st.session_state.persistent_users.keys())}")
-                        
-                        # Also check the authentication config
-                        try:
-                            current_config = load_users_config()
-                            auth_users = list(current_config['credentials']['usernames'].keys())
-                            st.write(f"• Users in auth config: {auth_users}")
-                        except Exception as e:
-                            st.write(f"• Error loading auth config: {e}")
-                        
-                        # Show all users including admin
-                        st.markdown("**All Users (including admin):**")
-                        
-                        # Combine users from both sources
-                        all_users = set(stats['users'])
-                        try:
-                            current_config = load_users_config()
-                            auth_users = set(current_config['credentials']['usernames'].keys())
-                            all_users.update(auth_users)
-                        except:
-                            pass
-                        
-                        for user in sorted(all_users):
-                            try:
-                                # Try to get from persistent storage first
-                                if user in st.session_state.persistent_users:
-                                    user_info = st.session_state.persistent_users[user]
-                                    source = "persistent"
-                                else:
-                                    # Try to get from auth config
-                                    current_config = load_users_config()
-                                    user_info = current_config['credentials']['usernames'][user]
-                                    source = "auth_config"
-                                
-                                if user == 'sksalapur':
-                                    st.write(f"🔧 **{user}** ({user_info['name']}) - {user_info['email']} [ADMIN] ({source})")
-                                else:
-                                    st.write(f"👤 **{user}** ({user_info['name']}) - {user_info['email']} ({source})")
-                            except Exception as e:
-                                st.write(f"❌ **{user}** - Error: {str(e)}")
-                        
-                        # Show non-admin users separately
-                        st.markdown("**Regular Users Only:**")
-                        non_admin_users = [user for user in sorted(all_users) if user != 'sksalapur']
-                        if non_admin_users:
-                            for user in non_admin_users:
-                                try:
-                                    # Try to get from persistent storage first
-                                    if user in st.session_state.persistent_users:
-                                        user_info = st.session_state.persistent_users[user]
-                                        source = "persistent"
-                                    else:
-                                        # Try to get from auth config
-                                        current_config = load_users_config()
-                                        user_info = current_config['credentials']['usernames'][user]
-                                        source = "auth_config"
-                                    
-                                    st.write(f"👤 **{user}** ({user_info['name']}) - {user_info['email']} ({source})")
-                                except Exception as e:
-                                    st.write(f"❌ **{user}** - Error: {str(e)}")
-                        else:
-                            st.info("No regular users registered yet.")
-                        
-                        # Force refresh button
-                        if st.button("🔄 Force Refresh User Data", use_container_width=True):
-                            # Clear any cached data and reinitialize
-                            init_persistent_storage()
-                            st.rerun()
-                
-                except Exception as e:
-                    st.error(f"Admin panel error: {e}")
-                    st.info("Try refreshing the page or logging out and back in.")
-            
-            # Data backup/restore
-            with st.expander("💾 Data Management", expanded=True):
-                st.markdown("**Backup Data:**")
-                if st.button("📥 Export User Data", use_container_width=True):
-                    export_data = export_user_data()
-                    st.download_button(
-                        label="💾 Download Backup File",
-                        data=str(export_data),
-                        file_name=f"sanatanagpt_backup_{int(time.time())}.json",
-                        mime="application/json",
-                        use_container_width=True
-                    )
-                    st.success("✅ Backup ready for download!")
-                
-                st.markdown("**Restore Data:**")
-                st.info("💡 **Note:** Data persistence is limited on Streamlit Cloud. Users will need to re-register after app restarts unless you configure persistent storage.")
-                
-                # Show current session persistence status
-                st.markdown("**Current Session Status:**")
-                st.write(f"• Users in memory: {len(st.session_state.persistent_users)}")
-                st.write(f"• Conversations in memory: {len(st.session_state.persistent_user_data)}")
-                
-                if st.button("🔄 Refresh Stats", use_container_width=True):
-                    st.rerun()
             
             # Conversation management
             st.header("💬 Your Conversations")
