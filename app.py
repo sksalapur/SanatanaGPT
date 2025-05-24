@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import google.generativeai as genai
 import time
 import re
+import datetime
 
 # Load environment variables
 load_dotenv()
@@ -23,11 +24,16 @@ def setup_gemini():
     # Try to get API key from Streamlit secrets first (for cloud deployment)
     api_key = None
     
-    # Check Streamlit secrets (for cloud deployment)
-    if hasattr(st, 'secrets') and 'GOOGLE_API_KEY' in st.secrets:
-        api_key = st.secrets['GOOGLE_API_KEY']
+    # Check Streamlit secrets (for cloud deployment) - handle gracefully if no secrets file
+    try:
+        if hasattr(st, 'secrets') and 'GOOGLE_API_KEY' in st.secrets:
+            api_key = st.secrets['GOOGLE_API_KEY']
+    except Exception:
+        # No secrets file found, that's okay for local development
+        pass
+    
     # Fallback to environment variable (for local development)
-    elif os.getenv("GOOGLE_API_KEY"):
+    if not api_key and os.getenv("GOOGLE_API_KEY"):
         api_key = os.getenv("GOOGLE_API_KEY")
     
     if not api_key:
@@ -82,12 +88,16 @@ def load_hindu_texts():
     
     return texts
 
-def search_relevant_passages(texts, query, max_passages=3):
-    """Search for relevant passages in the texts."""
+def search_relevant_passages(texts, query, max_passages=3, balance_sources=True):
+    """Search for relevant passages in the texts with balanced representation."""
     results = []
     query_words = [word.lower().strip() for word in re.split(r'[^\w]+', query) if len(word.strip()) > 2]
     
+    # First, collect results from each text separately
+    text_results = {}
+    
     for filename, content in texts.items():
+        text_results[filename] = []
         # Split content into paragraphs
         paragraphs = [p.strip() for p in content.split('\n\n') if len(p.strip()) > 100]
         
@@ -101,19 +111,56 @@ def search_relevant_passages(texts, query, max_passages=3):
                     score += paragraph_lower.count(word) * (len(word) / 10)  # Longer words get higher weight
             
             if score > 0:
-                results.append({
+                text_results[filename].append({
                     'filename': filename,
                     'text': paragraph,
                     'score': score,
                     'paragraph_id': i
                 })
+        
+        # Sort results for this text by score
+        text_results[filename].sort(key=lambda x: x['score'], reverse=True)
     
-    # Sort by relevance score and return top results
+    # Now ensure balanced representation from all texts
+    # Take the best passages from each text, then fill remaining slots with highest scores overall
+    passages_per_text = max(1, max_passages // len(texts))  # At least 1 passage per text if possible
+    
+    if balance_sources:
+        # First pass: get top passages from each text
+        for filename, file_results in text_results.items():
+            if file_results:  # Only if this text has relevant passages
+                # Take top passages from this text
+                for passage in file_results[:passages_per_text]:
+                    results.append(passage)
+        
+        # Second pass: if we still have slots, fill with remaining highest-scoring passages
+        remaining_slots = max_passages - len(results)
+        if remaining_slots > 0:
+            # Collect all remaining passages
+            all_remaining = []
+            for filename, file_results in text_results.items():
+                # Add passages beyond what we already took
+                all_remaining.extend(file_results[passages_per_text:])
+            
+            # Sort by score and take the best remaining ones
+            all_remaining.sort(key=lambda x: x['score'], reverse=True)
+            results.extend(all_remaining[:remaining_slots])
+    else:
+        # Just take the highest scoring passages regardless of source
+        all_passages = []
+        for filename, file_results in text_results.items():
+            all_passages.extend(file_results)
+        
+        # Sort by score and take the best ones
+        all_passages.sort(key=lambda x: x['score'], reverse=True)
+        results = all_passages[:max_passages]
+    
+    # Final sort by relevance score and return top results
     results.sort(key=lambda x: x['score'], reverse=True)
     return results[:max_passages]
 
-def generate_answer(model, query, passages):
-    """Generate answer using Gemini with relevant passages."""
+def generate_answer(model, query, passages, conversation_context=None):
+    """Generate answer using Gemini with relevant passages and conversation context."""
     if not passages:
         return "I couldn't find relevant passages in the Hindu scriptures for your question. Please try rephrasing or asking about different topics."
     
@@ -123,16 +170,23 @@ def generate_answer(model, query, passages):
         for passage in passages
     ])
     
-    prompt = f"""You are a knowledgeable scholar of Hindu scriptures. Based on the following excerpts from Hindu texts, please provide a comprehensive and accurate answer to the question.
+    # Prepare conversation context if available
+    conversation_history = ""
+    if conversation_context and len(conversation_context) > 0:
+        conversation_history = "\n\nPREVIOUS CONVERSATION:\n"
+        for i, exchange in enumerate(conversation_context[-3:]):  # Last 3 exchanges for context
+            conversation_history += f"Q{i+1}: {exchange['question']}\nA{i+1}: {exchange['answer'][:200]}...\n\n"
+    
+    prompt = f"""You are a wise and friendly guide who loves discussing Hindu philosophy and spirituality. You're having a casual, warm conversation with someone who's curious about these topics. Based on the following excerpts from Hindu texts and our previous conversation, please provide a thoughtful, conversational response.
 
 CONTEXT FROM HINDU SCRIPTURES:
-{context}
+{context}{conversation_history}
 
-QUESTION: {query}
+WHAT THEY'RE SHARING/ASKING: {query}
 
-Please provide a detailed answer based on the provided context. If the context doesn't fully answer the question, mention what information is available and suggest what additional sources might be helpful. Always cite which text the information comes from.
+Please respond in a warm, conversational way as if you're talking to a friend. If this relates to our previous conversation, acknowledge that naturally. Share insights from the scriptures in an accessible, relatable way. If you don't have enough context to fully address their thoughts, mention what you can share and suggest we could explore more together.
 
-ANSWER:"""
+YOUR RESPONSE:"""
 
     try:
         response = model.generate_content(prompt)
@@ -140,8 +194,105 @@ ANSWER:"""
     except Exception as e:
         return f"Error generating answer: {str(e)}"
 
+def generate_conversation_name(first_question):
+    """Generate a short, meaningful name for the conversation based on the first question."""
+    # Remove common prefixes
+    title = first_question
+    
+    prefixes_to_remove = [
+        "I've been thinking about",
+        "Tell me about",
+        "Can you explain",
+        "What's this concept of",
+        "I'm curious about",
+        "I want to understand",
+        "How do I",
+        "What does",
+        "I'm struggling with understanding",
+        "I'm interested in",
+        "How can I",
+        "What is",
+        "Help me understand",
+        "I want to know about"
+    ]
+    
+    for prefix in prefixes_to_remove:
+        if title.lower().startswith(prefix.lower()):
+            title = title[len(prefix):].strip()
+            break
+    
+    # Remove trailing punctuation
+    title = title.rstrip('?!.').strip()
+    
+    # Extract key concepts and create a meaningful name
+    key_words = []
+    important_concepts = [
+        'karma', 'dharma', 'atman', 'brahman', 'moksha', 'meditation', 'yoga',
+        'soul', 'god', 'krishna', 'arjuna', 'gita', 'upanishads', 'vedas',
+        'liberation', 'enlightenment', 'consciousness', 'self', 'reality',
+        'truth', 'wisdom', 'spiritual', 'divine', 'sacred', 'holy'
+    ]
+    
+    words = title.lower().split()
+    for word in words:
+        clean_word = word.strip('.,!?()[]{}":;')
+        if clean_word in important_concepts:
+            key_words.append(clean_word.title())
+        elif len(clean_word) > 4 and clean_word not in ['about', 'really', 'actually', 'means', 'works']:
+            key_words.append(clean_word.title())
+    
+    if key_words:
+        if len(key_words) == 1:
+            return f"{key_words[0]} Discussion"
+        elif len(key_words) == 2:
+            return f"{key_words[0]} & {key_words[1]}"
+        else:
+            return f"{key_words[0]} & {key_words[1]} Chat"
+    
+    # Fallback: use first few words
+    words = title.split()[:3]
+    if words:
+        return ' '.join(words).title()
+    
+    return "Philosophy Chat"
+
+def get_current_conversation():
+    """Get the current conversation data."""
+    if st.session_state.current_conversation_id is None:
+        return {'chat_history': [], 'conversation_context': []}
+    
+    return st.session_state.conversations.get(st.session_state.current_conversation_id, 
+                                            {'chat_history': [], 'conversation_context': []})
+
+def create_new_conversation():
+    """Create a new conversation."""
+    st.session_state.conversation_counter += 1
+    new_id = f"conv_{st.session_state.conversation_counter}"
+    st.session_state.conversations[new_id] = {
+        'chat_history': [],
+        'conversation_context': [],
+        'created_at': time.time()
+    }
+    st.session_state.current_conversation_id = new_id
+    return new_id
+
+def update_current_conversation(chat_history, conversation_context):
+    """Update the current conversation data."""
+    if st.session_state.current_conversation_id is None:
+        create_new_conversation()
+    
+    st.session_state.conversations[st.session_state.current_conversation_id]['chat_history'] = chat_history
+    st.session_state.conversations[st.session_state.current_conversation_id]['conversation_context'] = conversation_context
+
 def main():
     """Main Streamlit application."""
+    
+    # Initialize session state FIRST - using setdefault for robustness
+    st.session_state.setdefault('user_question', "")
+    st.session_state.setdefault('conversations', {})  # Dictionary to store multiple conversations
+    st.session_state.setdefault('current_conversation_id', None)
+    st.session_state.setdefault('conversation_counter', 0)
+    st.session_state.setdefault('pending_example', None)
     
     # Header
     st.title("🕉️ Hindu Scriptures Q&A")
@@ -166,93 +317,434 @@ def main():
         for filename in texts.keys():
             st.write(f"• {filename}")
         
+        # Conversation management
+        st.header("💬 Conversations")
+        
+        # New conversation button with better styling
+        if st.button("✨ Start New Chat", use_container_width=True, type="primary"):
+            create_new_conversation()
+            st.rerun()
+        
+        # Show existing conversations
+        st.markdown("### 📋 Chat History")
+        
+        if st.session_state.conversations:
+            # Sort conversations by creation time (newest first)
+            sorted_conversations = sorted(
+                st.session_state.conversations.items(),
+                key=lambda x: x[1]['created_at'],
+                reverse=True
+            )
+            
+            for conv_id, conv_data in sorted_conversations:
+                # Highlight current conversation
+                is_current = conv_id == st.session_state.current_conversation_id
+                
+                # Create conversation card with expandable design
+                with st.container():
+                    # Get conversation title using AI-generated name
+                    chat_history = conv_data['chat_history']
+                    if chat_history and len(chat_history) > 0:
+                        # Generate AI-based conversation name
+                        first_question = chat_history[0]['question']
+                        title = generate_conversation_name(first_question)
+                    else:
+                        title = "New Chat"
+                    
+                    # Display conversation as expandable item
+                    if is_current:
+                        # Current conversation - highlighted
+                        current_indicator = "🔥"
+                        expanded_default = True
+                    else:
+                        current_indicator = "💭"
+                        expanded_default = False
+                    
+                    # Create expandable conversation
+                    with st.expander(f"{current_indicator} {title}", expanded=expanded_default):
+                        if chat_history:
+                            # Show conversation statistics
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.metric("Messages", len(chat_history))
+                            with col2:
+                                # Calculate total sources used
+                                total_sources = 0
+                                unique_sources = set()
+                                for chat in chat_history:
+                                    if 'passages' in chat and chat['passages']:
+                                        total_sources += len(chat['passages'])
+                                        for passage in chat['passages']:
+                                            unique_sources.add(passage['filename'])
+                                st.metric("Sources Used", len(unique_sources))
+                            
+                            # Show timestamp info
+                            timestamp = datetime.datetime.fromtimestamp(conv_data['created_at'])
+                            time_ago = datetime.datetime.now() - timestamp
+                            
+                            if time_ago.days > 0:
+                                time_str = f"{time_ago.days} days ago"
+                            elif time_ago.seconds > 3600:
+                                time_str = f"{time_ago.seconds // 3600} hours ago"
+                            elif time_ago.seconds > 60:
+                                time_str = f"{time_ago.seconds // 60} minutes ago"
+                            else:
+                                time_str = "Just now"
+                            
+                            st.caption(f"⏰ Created: {timestamp.strftime('%B %d, %Y at %I:%M %p')} ({time_str})")
+                            
+                            # Show last message preview
+                            last_msg = chat_history[-1]
+                            st.markdown("**Last Question:**")
+                            st.markdown(f"*{last_msg['question'][:100]}{'...' if len(last_msg['question']) > 100 else ''}*")
+                            
+                            # Show sources from last message if available
+                            if 'passages' in last_msg and last_msg['passages']:
+                                sources = set()
+                                for passage in last_msg['passages']:
+                                    filename = passage['filename'].replace('.txt', '').replace('_', ' ').title()
+                                    sources.add(filename)
+                                st.markdown(f"**Recent Sources:** {', '.join(sources)}")
+                            
+                            st.markdown("---")
+                            
+                            # Action buttons
+                            col1, col2, col3 = st.columns(3)
+                            
+                            with col1:
+                                if not is_current:
+                                    if st.button("🔄 Switch to this chat", key=f"switch_exp_{conv_id}", use_container_width=True):
+                                        st.session_state.current_conversation_id = conv_id
+                                        st.rerun()
+                                else:
+                                    st.info("📍 Current conversation")
+                            
+                            with col2:
+                                if st.button("🔗 Copy Link", key=f"copy_exp_{conv_id}", use_container_width=True):
+                                    link = f"http://localhost:8501/?conv={conv_id}"
+                                    st.markdown(f"""
+                                    <script>
+                                    navigator.clipboard.writeText('{link}').then(function() {{
+                                        console.log('Link copied to clipboard');
+                                    }});
+                                    </script>
+                                    """, unsafe_allow_html=True)
+                                    st.toast("🔗 Link copied to clipboard!", icon="✅")
+                            
+                            with col3:
+                                if st.button("🗑️ Delete Chat", key=f"delete_exp_{conv_id}", use_container_width=True, type="secondary"):
+                                    # Confirmation before deletion
+                                    if st.button("⚠️ Confirm Delete", key=f"confirm_delete_{conv_id}", type="primary"):
+                                        del st.session_state.conversations[conv_id]
+                                        if st.session_state.current_conversation_id == conv_id:
+                                            if st.session_state.conversations:
+                                                st.session_state.current_conversation_id = list(st.session_state.conversations.keys())[0]
+                                            else:
+                                                st.session_state.current_conversation_id = None
+                                        st.rerun()
+                                    else:
+                                        st.warning("Click 'Confirm Delete' to permanently delete this conversation.")
+                        else:
+                            # Empty conversation
+                            st.info("💭 This conversation is empty")
+                            st.caption("Start chatting to see conversation details here.")
+                            
+                            # Delete button for empty conversations
+                            if st.button("🗑️ Remove Empty Chat", key=f"delete_empty_exp_{conv_id}", use_container_width=True):
+                                del st.session_state.conversations[conv_id]
+                                if st.session_state.current_conversation_id == conv_id:
+                                    if st.session_state.conversations:
+                                        st.session_state.current_conversation_id = list(st.session_state.conversations.keys())[0]
+                                    else:
+                                        st.session_state.current_conversation_id = None
+                                st.rerun()
+            
+            # Show total count in a more appealing way
+            total_convs = len(st.session_state.conversations)
+            if total_convs == 1:
+                st.markdown(f"<div style='text-align: center; color: #666; font-size: 12px;'>💫 {total_convs} conversation</div>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"<div style='text-align: center; color: #666; font-size: 12px;'>💫 {total_convs} conversations</div>", unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div style="
+                text-align: center; 
+                padding: 20px; 
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                border-radius: 10px;
+                margin: 10px 0;
+            ">
+                <div style="color: white; font-size: 16px; margin-bottom: 8px;">🌟</div>
+                <div style="color: white; font-size: 14px;">Start your first conversation!</div>
+                <div style="color: rgba(255,255,255,0.8); font-size: 12px; margin-top: 5px;">Ask about Hindu philosophy</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
         st.header("⚙️ Settings")
         max_passages = st.slider(
             "Number of passages to analyze",
             min_value=1,
-            max_value=5,
+            max_value=10,
             value=3,
-            help="More passages provide more context but slower responses"
+            step=1,
+            help="More passages provide more context but slower responses. Recommended: 3-5 for balanced results."
         )
         
-        st.header("💡 Example Questions")
+        # Advanced settings in an expander
+        with st.expander("🔧 Advanced Settings"):
+            st.info("💡 **Tip:** Just press Enter to send your message!")
+            balance_sources = st.checkbox(
+                "Balance sources equally",
+                value=True,
+                help="Ensures representation from all available texts when possible"
+            )
+        
+        st.header("💡 Example Topics")
         examples = [
-            "What is dharma according to the Bhagavad Gita?",
-            "What does Om represent in Hindu philosophy?",
-            "What is karma and how does it work?",
-            "What are the four goals of human life?",
-            "What is the nature of the soul (Atman)?",
-            "What does Krishna teach about duty?",
-            "What is meditation according to the Vedas?",
-            "What is the path to liberation (moksha)?"
+            "I've been thinking about what dharma really means...",
+            "Tell me about karma - how does it actually work?",
+            "I'm curious about meditation and how to start",
+            "What's this concept of Atman I keep hearing about?",
+            "I'm struggling with understanding my purpose in life",
+            "Can you explain what Brahman is in simple terms?",
+            "I want to understand the soul better",
+            "How can I live more spiritually?",
+            "What does liberation actually mean?",
+            "I'm interested in the Bhagavad Gita's teachings",
+            "Tell me about the Upanishads",
+            "How do I deal with difficult emotions spiritually?"
         ]
         
         for i, example in enumerate(examples):
-            if st.button(f"📝 {example}", key=f"example_{i}"):
-                st.session_state.user_question = example
+            if st.button(f"💭 {example}", key=f"example_{i}"):
+                # Create new conversation if none exists
+                if st.session_state.current_conversation_id is None:
+                    create_new_conversation()
+                
+                # Get current conversation data
+                current_conv = get_current_conversation()
+                chat_history = current_conv['chat_history']
+                
+                # Add the example to chat history and trigger processing
+                chat_history.append({
+                    'question': example,
+                    'answer': "Processing your question...",
+                    'passages': [],
+                    'timestamp': time.time()
+                })
+                
+                # Update the conversation
+                update_current_conversation(chat_history, current_conv['conversation_context'])
+                st.session_state.pending_example = example
+                st.rerun()
+        
+        # Clear conversation button
+        st.markdown("---")
+        if st.button("🧹 New Conversation", use_container_width=True):
+            create_new_conversation()
+            st.rerun()
 
     # Main content area
-    st.header("🔍 Ask Your Question")
+    st.header("💬 Chat with Hindu Scriptures")
     
-    # Initialize session state
-    if 'user_question' not in st.session_state:
-        st.session_state.user_question = ""
+    # Get current conversation data
+    current_conv = get_current_conversation()
+    chat_history = current_conv['chat_history']
+    conversation_context = current_conv['conversation_context']
     
-    # Question input
-    question = st.text_area(
-        "What would you like to know about Hindu scriptures?",
-        value=st.session_state.user_question,
-        height=100,
-        placeholder="e.g., What does the Bhagavad Gita say about the nature of reality?",
-        key="question_input"
-    )
-    
-    # Search button
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        search_button = st.button("🔍 Search Scriptures", type="primary", use_container_width=True)
-    
-    # Process question
-    if search_button and question.strip():
-        with st.spinner("🔍 Searching through Hindu scriptures..."):
+    # Display conversation history as chat messages
+    if chat_history:
+        st.markdown("### 🗨️ Conversation")
+        
+        # Create a container for the chat messages
+        chat_container = st.container()
+        
+        with chat_container:
+            for i, chat in enumerate(chat_history):
+                # User message
+                with st.chat_message("user"):
+                    st.write(chat['question'])
+                
+                # Assistant message
+                with st.chat_message("assistant"):
+                    st.write(chat['answer'])
+                    
+                    # Show sources button if passages are available
+                    if 'passages' in chat and chat['passages']:
+                        # Create a unique key for this chat's source button
+                        source_key = f"sources_{st.session_state.current_conversation_id}_{i}"
+                        
+                        # Count sources
+                        source_counts = {}
+                        for passage in chat['passages']:
+                            filename = passage['filename']
+                            source_counts[filename] = source_counts.get(filename, 0) + 1
+                        
+                        source_text = ", ".join([f"{filename.replace('.txt', '').replace('_', ' ').title()}" for filename in source_counts.keys()])
+                        
+                        # Source button
+                        if st.button(f"📚 View Sources ({len(chat['passages'])} passages)", key=source_key, help=f"Sources: {source_text}"):
+                            # Toggle source display
+                            if f"show_{source_key}" not in st.session_state:
+                                st.session_state[f"show_{source_key}"] = False
+                            st.session_state[f"show_{source_key}"] = not st.session_state[f"show_{source_key}"]
+                            st.rerun()
+                        
+                        # Show detailed sources if toggled
+                        if st.session_state.get(f"show_{source_key}", False):
+                            st.markdown("**📖 Source Passages:**")
+                            for j, passage in enumerate(chat['passages']):
+                                with st.expander(f"📜 {passage['filename'].replace('.txt', '').replace('_', ' ').title()} - Passage {j+1}", expanded=False):
+                                    st.markdown(f"**Relevance Score:** {passage['score']:.2f}")
+                                    st.markdown("**Text:**")
+                                    st.markdown(f"*{passage['text']}*")
+                    else:
+                        # Show subtle caption for responses without sources
+                        st.caption("💭 Response generated from general knowledge")
+        
+        st.markdown("---")
+    else:
+        # Welcome message for new users
+        st.markdown("### 🙏 Welcome!")
+        with st.chat_message("assistant"):
+            st.write("""
+            Hello! I'm here to help you explore the wisdom of Hindu scriptures. I have access to the Bhagavad Gita and Upanishads, and I can discuss topics like:
+            
+            - **Dharma** and righteous living
+            - **Karma** and the law of action
+            - **Atman** and the nature of the soul
+            - **Brahman** and ultimate reality
+            - **Meditation** and spiritual practices
+            - **Liberation (Moksha)** and the spiritual path
+            
+            Feel free to ask me anything or just start a conversation about what interests you! 😊
+            """)
+        st.markdown("---")
+
+    # Process pending example if any
+    if 'pending_example' in st.session_state and st.session_state.pending_example:
+        prompt = st.session_state.pending_example
+        st.session_state.pending_example = None  # Clear the pending example
+        
+        # Get current conversation data
+        current_conv = get_current_conversation()
+        chat_history = current_conv['chat_history']
+        conversation_context = current_conv['conversation_context']
+        
+        # Process the example message
+        with st.spinner("🤔 Reflecting on the scriptures..."):
             start_time = time.time()
             
             # Find relevant passages
-            passages = search_relevant_passages(texts, question, max_passages)
+            passages = search_relevant_passages(texts, prompt, max_passages, balance_sources)
             
             if passages:
                 # Generate answer
-                answer = generate_answer(model, question, passages)
+                answer = generate_answer(model, prompt, passages, conversation_context)
                 
                 search_time = time.time() - start_time
                 
-                # Display results
-                st.markdown("### 📖 Answer")
-                st.markdown(f"*Response generated in {search_time:.1f} seconds*")
-                st.write(answer)
+                # Update the last message in chat history with the real answer
+                if chat_history:
+                    chat_history[-1] = {
+                        'question': prompt,
+                        'answer': answer,
+                        'passages': passages,
+                        'timestamp': time.time()
+                    }
                 
-                # Show sources
-                st.markdown("### 📚 Source Passages")
-                for i, passage in enumerate(passages, 1):
-                    with st.expander(f"📜 Source {i}: {passage['filename']} (Relevance: {passage['score']:.1f})"):
-                        st.write(passage['text'])
+                # Add to conversation context (for AI)
+                conversation_context.append({
+                    'question': prompt,
+                    'answer': answer
+                })
+                
+                # Keep only last 10 conversations to avoid token limits
+                if len(conversation_context) > 10:
+                    conversation_context = conversation_context[-10:]
+                    
+                # Update the conversation
+                update_current_conversation(chat_history, conversation_context)
             else:
-                st.warning("🔍 No relevant passages found. Try rephrasing your question or using different keywords.")
-    
-    elif search_button:
-        st.warning("⚠️ Please enter a question to search.")
-    
-    # Clear button
-    if st.button("🗑️ Clear Question"):
-        st.session_state.user_question = ""
+                # Update with no results message
+                if chat_history:
+                    chat_history[-1] = {
+                        'question': prompt,
+                        'answer': "I couldn't find relevant passages in the Hindu scriptures for your thoughts. Could you try rephrasing or exploring a different aspect of Hindu philosophy?",
+                        'passages': [],
+                        'timestamp': time.time()
+                    }
+                    # Update the conversation
+                    update_current_conversation(chat_history, conversation_context)
+        
         st.rerun()
     
+    # Chat input at the bottom (modern AI bot style)
+    if prompt := st.chat_input("Share your thoughts about Hindu philosophy..."):
+        # Create new conversation if none exists
+        if st.session_state.current_conversation_id is None:
+            create_new_conversation()
+        
+        # Get current conversation data
+        current_conv = get_current_conversation()
+        chat_history = current_conv['chat_history']
+        conversation_context = current_conv['conversation_context']
+        
+        # Process the message immediately
+        with st.spinner("🤔 Reflecting on the scriptures..."):
+            start_time = time.time()
+            
+            # Find relevant passages
+            passages = search_relevant_passages(texts, prompt, max_passages, balance_sources)
+            
+            if passages:
+                # Generate answer
+                answer = generate_answer(model, prompt, passages, conversation_context)
+                
+                search_time = time.time() - start_time
+                
+                # Add to conversation history
+                chat_history.append({
+                    'question': prompt,
+                    'answer': answer,
+                    'passages': passages,
+                    'timestamp': time.time()
+                })
+                
+                # Add to conversation context (for AI)
+                conversation_context.append({
+                    'question': prompt,
+                    'answer': answer
+                })
+                
+                # Keep only last 10 conversations to avoid token limits
+                if len(conversation_context) > 10:
+                    conversation_context = conversation_context[-10:]
+                
+                # Update the conversation
+                update_current_conversation(chat_history, conversation_context)
+                
+            else:
+                # Add message with no results
+                chat_history.append({
+                    'question': prompt,
+                    'answer': "I couldn't find relevant passages in the Hindu scriptures for your thoughts. Could you try rephrasing or exploring a different aspect of Hindu philosophy?",
+                    'passages': [],
+                    'timestamp': time.time()
+                })
+                
+                # Update the conversation
+                update_current_conversation(chat_history, conversation_context)
+        
+        # Rerun to update the chat display
+        st.rerun()
+
     # Footer
     st.markdown("---")
     st.markdown("""
     <div style='text-align: center; color: #666; padding: 1rem;'>
-        <p>🕉️ <strong>Hindu Scriptures Q&A</strong> 🕉️</p>
-        <p>Powered by Google Gemini AI • Built with ❤️ for spiritual seekers</p>
+        <p>🕉️ <strong>Your Friendly Guide to Hindu Wisdom</strong> 🕉️</p>
+        <p>Powered by Google Gemini AI • Built with ❤️ for spiritual conversations</p>
     </div>
     """, unsafe_allow_html=True)
 
