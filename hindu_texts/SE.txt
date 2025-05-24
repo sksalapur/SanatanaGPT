@@ -1,0 +1,17 @@
+Important Software Engineering Concepts:
+
+1. SDLC Models:
+   - Waterfall, Agile, Spiral, V-Model
+
+2. Requirements Engineering:
+   - Functional and Non-functional requirements, SRS
+
+3. Design:
+   - UML Diagrams, Architecture styles (MVC, Client-Server)
+
+4. Testing:
+   - Unit, Integration, System, Acceptance Testing
+   - Black Box and White Box Testing
+
+5. Project Management:
+   - Effort Estimation (COCOMO), Risk Management, Metrics

@@ -1,0 +1,17 @@
+Important DBMS Concepts:
+
+1. Normalization:
+   - 1NF, 2NF, 3NF, BCNF - Reduces data redundancy and anomalies
+
+2. Transactions and Concurrency Control:
+   - ACID Properties, Serializability, Locking protocols
+
+3. SQL:
+   - DDL, DML commands
+   - Joins, Subqueries, Aggregation
+
+4. Indexing:
+   - B+ Trees, Hash Indexing for faster search
+
+5. ER Model:
+   - Entities, Relationships, Keys, Cardinality

@@ -1,0 +1,21 @@
+Important DSA Concepts:
+
+1. Time and Space Complexity:
+   - Big-O notation describes the worst-case runtime.
+   - Examples: O(1), O(log n), O(n), O(n log n), O(n^2)
+
+2. Sorting Algorithms:
+   - Merge Sort (Divide and Conquer): O(n log n)
+   - Quick Sort (Average O(n log n), worst O(n^2))
+   - Heap Sort, Bubble Sort, Insertion Sort
+
+3. Trees and Graphs:
+   - Binary Search Tree, AVL Tree, B-Trees
+   - DFS, BFS, Dijkstra’s Algorithm, Kruskal’s and Prim’s Algorithms
+
+4. Dynamic Programming:
+   - Memoization and Tabulation
+   - Examples: Knapsack, Longest Common Subsequence, Matrix Chain Multiplication
+
+5. Recursion and Backtracking:
+   - Used in problems like N-Queens, Sudoku Solver, Subset Generation

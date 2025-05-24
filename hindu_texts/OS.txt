@@ -1,0 +1,17 @@
+Important Operating System Concepts:
+
+1. Process Management:
+   - PCB, Context Switching, Scheduling (FCFS, SJF, Round Robin)
+
+2. Deadlocks:
+   - Conditions: Mutual Exclusion, Hold and Wait, No Preemption, Circular Wait
+   - Avoidance: Banker's Algorithm
+
+3. Memory Management:
+   - Paging, Segmentation, Virtual Memory, Page Replacement Algorithms (LRU, FIFO)
+
+4. File Systems:
+   - File allocation methods: Contiguous, Linked, Indexed
+
+5. Synchronization:
+   - Race Conditions, Semaphores, Monitors, Critical Section Problem
