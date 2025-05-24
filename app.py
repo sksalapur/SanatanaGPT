@@ -43,19 +43,19 @@ def init_persistent_storage():
             else:
                 # Default admin user if no secrets configured
                 st.session_state.persistent_users = {
-                    'admin': {
-                        'email': 'admin@sanatanagpt.com',
+                    'sksalapur': {
+                        'email': 'sksalapur@gmail.com',
                         'name': 'Administrator',
-                        'password': '$2b$12$rQKvI4gE8ZqKqOqKqOqKqOqKqOqKqOqKqOqKqOqKqOqKqOqKqOqKq'  # hashed 'admin123'
+                        'password': 'sksalapur'  # Will be hashed
                     }
                 }
         except Exception:
             # Fallback to default admin
             st.session_state.persistent_users = {
-                'admin': {
-                    'email': 'admin@sanatanagpt.com',
+                'sksalapur': {
+                    'email': 'sksalapur@gmail.com',
                     'name': 'Administrator',
-                    'password': 'admin123'  # Will be hashed
+                    'password': 'sksalapur'  # Will be hashed
                 }
             }
     
@@ -587,7 +587,7 @@ def test_admin_credentials():
     """Test if admin credentials are properly set up."""
     try:
         init_persistent_storage()
-        admin_user = st.session_state.persistent_users.get('admin')
+        admin_user = st.session_state.persistent_users.get('sksalapur')
         if admin_user:
             return True, f"Admin user found: {admin_user['name']} ({admin_user['email']})"
         else:
@@ -973,7 +973,7 @@ def main():
                 st.markdown("**📧 Email:** Logging out...")
             
             # Admin panel for admin users
-            if username == 'admin':
+            if username == 'sksalapur':
                 st.markdown("---")
                 st.header("⚙️ Management")
                 
@@ -990,7 +990,7 @@ def main():
                     with st.expander("👥 Registered Users", expanded=True):
                         st.markdown("**All registered users:**")
                         for user in stats['users']:
-                            if user != 'admin':
+                            if user != 'sksalapur':
                                 try:
                                     user_info = st.session_state.persistent_users[user]
                                     st.write(f"**{user}** ({user_info['name']}) - {user_info['email']}")
