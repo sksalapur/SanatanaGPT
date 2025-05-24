@@ -203,9 +203,8 @@ def get_base_url():
         # Check for Streamlit Cloud environment variables
         if any(key in os.environ for key in ['STREAMLIT_SHARING_MODE', 'STREAMLIT_CLOUD', 'STREAMLIT_SERVER_PORT']):
             # We're likely on Streamlit Cloud
-            # TODO: Replace this with your actual Streamlit Cloud URL after deployment
-            # Format: https://your-app-name-your-github-username.streamlit.app
-            return "https://sanatanagpt.streamlit.app"  # ⚠️ UPDATE THIS WITH YOUR ACTUAL URL
+            # Use a more generic approach - this will be updated after deployment
+            return "https://your-app-url.streamlit.app"  # ⚠️ UPDATE THIS AFTER DEPLOYMENT
         else:
             # Local development
             return "http://localhost:8501"
