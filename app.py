@@ -996,26 +996,62 @@ def main():
                         st.write(f"• Users list from stats: {stats['users']}")
                         st.write(f"• Raw persistent_users keys: {list(st.session_state.persistent_users.keys())}")
                         
+                        # Also check the authentication config
+                        try:
+                            current_config = load_users_config()
+                            auth_users = list(current_config['credentials']['usernames'].keys())
+                            st.write(f"• Users in auth config: {auth_users}")
+                        except Exception as e:
+                            st.write(f"• Error loading auth config: {e}")
+                        
                         # Show all users including admin
                         st.markdown("**All Users (including admin):**")
-                        for user in stats['users']:
+                        
+                        # Combine users from both sources
+                        all_users = set(stats['users'])
+                        try:
+                            current_config = load_users_config()
+                            auth_users = set(current_config['credentials']['usernames'].keys())
+                            all_users.update(auth_users)
+                        except:
+                            pass
+                        
+                        for user in sorted(all_users):
                             try:
-                                user_info = st.session_state.persistent_users[user]
-                                if user == 'sksalapur':
-                                    st.write(f"🔧 **{user}** ({user_info['name']}) - {user_info['email']} [ADMIN]")
+                                # Try to get from persistent storage first
+                                if user in st.session_state.persistent_users:
+                                    user_info = st.session_state.persistent_users[user]
+                                    source = "persistent"
                                 else:
-                                    st.write(f"👤 **{user}** ({user_info['name']}) - {user_info['email']}")
+                                    # Try to get from auth config
+                                    current_config = load_users_config()
+                                    user_info = current_config['credentials']['usernames'][user]
+                                    source = "auth_config"
+                                
+                                if user == 'sksalapur':
+                                    st.write(f"🔧 **{user}** ({user_info['name']}) - {user_info['email']} [ADMIN] ({source})")
+                                else:
+                                    st.write(f"👤 **{user}** ({user_info['name']}) - {user_info['email']} ({source})")
                             except Exception as e:
                                 st.write(f"❌ **{user}** - Error: {str(e)}")
                         
                         # Show non-admin users separately
                         st.markdown("**Regular Users Only:**")
-                        non_admin_users = [user for user in stats['users'] if user != 'sksalapur']
+                        non_admin_users = [user for user in sorted(all_users) if user != 'sksalapur']
                         if non_admin_users:
                             for user in non_admin_users:
                                 try:
-                                    user_info = st.session_state.persistent_users[user]
-                                    st.write(f"👤 **{user}** ({user_info['name']}) - {user_info['email']}")
+                                    # Try to get from persistent storage first
+                                    if user in st.session_state.persistent_users:
+                                        user_info = st.session_state.persistent_users[user]
+                                        source = "persistent"
+                                    else:
+                                        # Try to get from auth config
+                                        current_config = load_users_config()
+                                        user_info = current_config['credentials']['usernames'][user]
+                                        source = "auth_config"
+                                    
+                                    st.write(f"👤 **{user}** ({user_info['name']}) - {user_info['email']} ({source})")
                                 except Exception as e:
                                     st.write(f"❌ **{user}** - Error: {str(e)}")
                         else:
