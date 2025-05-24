@@ -583,6 +583,18 @@ def import_user_data(import_data):
     except Exception as e:
         return False, f"Import failed: {str(e)}"
 
+def test_admin_credentials():
+    """Test if admin credentials are properly set up."""
+    try:
+        init_persistent_storage()
+        admin_user = st.session_state.persistent_users.get('admin')
+        if admin_user:
+            return True, f"Admin user found: {admin_user['name']} ({admin_user['email']})"
+        else:
+            return False, "Admin user not found in persistent storage"
+    except Exception as e:
+        return False, f"Error testing admin credentials: {e}"
+
 def get_user_stats():
     """Get statistics about registered users and conversations."""
     init_persistent_storage()
@@ -739,6 +751,21 @@ def main():
         
     elif authentication_status == None:
         st.warning('Please enter your username and password')
+        
+        # Debug information
+        with st.expander("🔧 Debug Information"):
+            admin_test, admin_msg = test_admin_credentials()
+            if admin_test:
+                st.success(f"✅ {admin_msg}")
+                st.info("**Admin Login:** Username: `admin`, Password: `admin123`")
+            else:
+                st.error(f"❌ {admin_msg}")
+            
+            # Show available users
+            init_persistent_storage()
+            st.write("**Available users:**")
+            for username, user_info in st.session_state.persistent_users.items():
+                st.write(f"• **{username}** - {user_info['name']} ({user_info['email']})")
         
         # Show registration option
         st.markdown("---")
@@ -956,6 +983,7 @@ def main():
             # User info - protect against KeyError during logout
             st.markdown("---")
             st.markdown(f"**👤 Logged in as:** {name}")
+            st.markdown(f"**🔑 Username:** {username}")  # Debug info
             try:
                 user_email = config['credentials']['usernames'][username]['email']
                 st.markdown(f"**📧 Email:** {user_email}")
@@ -963,53 +991,69 @@ def main():
                 # Handle case where user data is being cleared during logout
                 st.markdown("**📧 Email:** Logging out...")
             
+            # Debug: Show if user is admin
+            if username == 'admin':
+                st.success("🔧 **Admin Access Detected!**")
+            else:
+                st.info(f"👤 **Regular User:** {username}")
+            
             # Admin panel for admin users
             if username == 'admin':
                 st.markdown("---")
                 st.header("🔧 Admin Panel")
+                st.markdown("**🎯 You have administrative privileges!**")
                 
                 # User statistics
-                stats = get_user_stats()
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("👥 Total Users", stats['total_users'])
-                with col2:
-                    st.metric("💬 Total Conversations", stats['total_conversations'])
+                try:
+                    stats = get_user_stats()
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("👥 Total Users", stats['total_users'])
+                    with col2:
+                        st.metric("💬 Total Conversations", stats['total_conversations'])
+                    
+                    # Show registered users
+                    with st.expander("👥 Registered Users", expanded=True):
+                        st.markdown("**All registered users:**")
+                        for user in stats['users']:
+                            if user != 'admin':
+                                try:
+                                    user_info = st.session_state.persistent_users[user]
+                                    st.write(f"**{user}** ({user_info['name']}) - {user_info['email']}")
+                                except:
+                                    st.write(f"**{user}** - Data unavailable")
+                        
+                        if len(stats['users']) == 1:  # Only admin
+                            st.info("No other users registered yet.")
+                    
+                    # Data backup/restore
+                    with st.expander("💾 Data Management", expanded=True):
+                        st.markdown("**Backup Data:**")
+                        if st.button("📥 Export User Data", use_container_width=True):
+                            export_data = export_user_data()
+                            st.download_button(
+                                label="💾 Download Backup File",
+                                data=str(export_data),
+                                file_name=f"sanatanagpt_backup_{int(time.time())}.json",
+                                mime="application/json",
+                                use_container_width=True
+                            )
+                            st.success("✅ Backup ready for download!")
+                        
+                        st.markdown("**Restore Data:**")
+                        st.info("💡 **Note:** Data persistence is limited on Streamlit Cloud. Users will need to re-register after app restarts unless you configure persistent storage.")
+                        
+                        # Show current session persistence status
+                        st.markdown("**Current Session Status:**")
+                        st.write(f"• Users in memory: {len(st.session_state.persistent_users)}")
+                        st.write(f"• Conversations in memory: {len(st.session_state.persistent_user_data)}")
+                        
+                        if st.button("🔄 Refresh Stats", use_container_width=True):
+                            st.rerun()
                 
-                # Show registered users
-                with st.expander("👥 Registered Users"):
-                    for user in stats['users']:
-                        if user != 'admin':
-                            try:
-                                user_info = st.session_state.persistent_users[user]
-                                st.write(f"**{user}** ({user_info['name']}) - {user_info['email']}")
-                            except:
-                                st.write(f"**{user}** - Data unavailable")
-                
-                # Data backup/restore
-                with st.expander("💾 Data Management"):
-                    st.markdown("**Backup Data:**")
-                    if st.button("📥 Export User Data", use_container_width=True):
-                        export_data = export_user_data()
-                        st.download_button(
-                            label="💾 Download Backup File",
-                            data=str(export_data),
-                            file_name=f"sanatanagpt_backup_{int(time.time())}.json",
-                            mime="application/json",
-                            use_container_width=True
-                        )
-                        st.success("✅ Backup ready for download!")
-                    
-                    st.markdown("**Restore Data:**")
-                    st.info("💡 **Note:** Data persistence is limited on Streamlit Cloud. Users will need to re-register after app restarts unless you configure persistent storage.")
-                    
-                    # Show current session persistence status
-                    st.markdown("**Current Session Status:**")
-                    st.write(f"• Users in memory: {len(st.session_state.persistent_users)}")
-                    st.write(f"• Conversations in memory: {len(st.session_state.persistent_user_data)}")
-                    
-                    if st.button("🔄 Refresh Stats", use_container_width=True):
-                        st.rerun()
+                except Exception as e:
+                    st.error(f"Admin panel error: {e}")
+                    st.info("Try refreshing the page or logging out and back in.")
             
             # Conversation management
             st.header("💬 Your Conversations")
