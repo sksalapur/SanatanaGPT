@@ -16,7 +16,7 @@ import random
 import string
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from email.validator import validate_email, EmailNotValidError
+from email_validator import validate_email, EmailNotValidError
 
 # Load environment variables
 load_dotenv()
