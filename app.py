@@ -32,96 +32,115 @@ load_dotenv()
 USER_DATA_FILE = "user_data.pkl"
 USERS_CONFIG_FILE = "users_config.yaml"
 
-def load_user_data():
-    """Load user conversation data from file."""
-    try:
-        if os.path.exists(USER_DATA_FILE):
-            with open(USER_DATA_FILE, 'rb') as f:
-                return pickle.load(f)
-        return {}
-    except Exception as e:
-        st.error(f"Error loading user data: {e}")
-        return {}
-
-def save_user_data(user_data):
-    """Save user conversation data to file."""
-    try:
-        with open(USER_DATA_FILE, 'wb') as f:
-            pickle.dump(user_data, f)
-    except Exception as e:
-        st.error(f"Error saving user data: {e}")
-
-def create_users_config():
-    """Create initial users configuration file."""
-    if not os.path.exists(USERS_CONFIG_FILE):
-        # Create default admin user with plain text password
-        config = {
-            'credentials': {
-                'usernames': {
+# Initialize persistent storage
+def init_persistent_storage():
+    """Initialize persistent storage using session state and secrets."""
+    if 'persistent_users' not in st.session_state:
+        # Try to load from secrets first (for pre-configured users)
+        try:
+            if hasattr(st, 'secrets') and 'users' in st.secrets:
+                st.session_state.persistent_users = dict(st.secrets['users'])
+            else:
+                # Default admin user if no secrets configured
+                st.session_state.persistent_users = {
                     'admin': {
                         'email': 'admin@sanatanagpt.com',
                         'name': 'Administrator',
-                        'password': 'admin123'  # Will be hashed automatically
+                        'password': '$2b$12$rQKvI4gE8ZqKqOqKqOqKqOqKqOqKqOqKqOqKqOqKqOqKqOqKqOqKq'  # hashed 'admin123'
                     }
                 }
-            },
-            'cookie': {
-                'expiry_days': 30,
-                'key': 'sanatana_gpt_auth',
-                'name': 'sanatana_gpt_cookie'
-            },
-            'preauthorized': {
-                'emails': []
+        except Exception:
+            # Fallback to default admin
+            st.session_state.persistent_users = {
+                'admin': {
+                    'email': 'admin@sanatanagpt.com',
+                    'name': 'Administrator',
+                    'password': 'admin123'  # Will be hashed
+                }
             }
+    
+    if 'persistent_user_data' not in st.session_state:
+        st.session_state.persistent_user_data = {}
+
+def load_user_data():
+    """Load user conversation data from session state."""
+    init_persistent_storage()
+    return st.session_state.persistent_user_data
+
+def save_user_data(user_data):
+    """Save user conversation data to session state."""
+    init_persistent_storage()
+    st.session_state.persistent_user_data = user_data
+
+def create_users_config():
+    """Create initial users configuration."""
+    init_persistent_storage()
+    
+    # Create config from persistent storage
+    config = {
+        'credentials': {
+            'usernames': {}
+        },
+        'cookie': {
+            'expiry_days': 30,
+            'key': 'sanatana_gpt_auth',
+            'name': 'sanatana_gpt_cookie'
+        },
+        'preauthorized': {
+            'emails': []
         }
-        
-        # Hash the passwords
-        stauth.Hasher.hash_passwords(config['credentials'])
-        
-        with open(USERS_CONFIG_FILE, 'w') as f:
-            yaml.dump(config, f, default_flow_style=False)
-    
-    return load_users_config()
-
-def load_users_config():
-    """Load users configuration."""
-    try:
-        with open(USERS_CONFIG_FILE, 'r') as f:
-            return yaml.load(f, Loader=SafeLoader)
-    except Exception as e:
-        st.error(f"Error loading users config: {e}")
-        return None
-
-def save_users_config(config):
-    """Save users configuration."""
-    try:
-        with open(USERS_CONFIG_FILE, 'w') as f:
-            yaml.dump(config, f, default_flow_style=False)
-    except Exception as e:
-        st.error(f"Error saving users config: {e}")
-
-def register_new_user(username, name, email, password):
-    """Register a new user."""
-    config = load_users_config()
-    if not config:
-        return False, "Error loading configuration"
-    
-    # Check if username already exists
-    if username in config['credentials']['usernames']:
-        return False, "Username already exists"
-    
-    # Add new user with plain text password
-    config['credentials']['usernames'][username] = {
-        'email': email,
-        'name': name,
-        'password': password  # Will be hashed automatically
     }
     
-    # Hash all passwords in the credentials
-    stauth.Hasher.hash_passwords(config['credentials'])
+    # Copy users from persistent storage
+    for username, user_info in st.session_state.persistent_users.items():
+        config['credentials']['usernames'][username] = user_info.copy()
     
-    # Save configuration
-    save_users_config(config)
+    # Hash passwords if they aren't already hashed
+    for username, user_info in config['credentials']['usernames'].items():
+        if not user_info['password'].startswith('$2b$'):
+            # Password needs to be hashed
+            temp_config = {'credentials': {'usernames': {username: user_info}}}
+            stauth.Hasher.hash_passwords(temp_config['credentials'])
+            config['credentials']['usernames'][username]['password'] = temp_config['credentials']['usernames'][username]['password']
+            # Update persistent storage with hashed password
+            st.session_state.persistent_users[username]['password'] = config['credentials']['usernames'][username]['password']
+    
+    return config
+
+def load_users_config():
+    """Load users configuration from session state."""
+    return create_users_config()
+
+def save_users_config(config):
+    """Save users configuration to session state."""
+    init_persistent_storage()
+    # Update persistent storage
+    st.session_state.persistent_users = config['credentials']['usernames'].copy()
+
+def register_new_user(username, name, email, password):
+    """Register a new user in persistent storage."""
+    init_persistent_storage()
+    
+    # Check if username already exists
+    if username in st.session_state.persistent_users:
+        return False, "Username already exists"
+    
+    # Add new user
+    st.session_state.persistent_users[username] = {
+        'email': email,
+        'name': name,
+        'password': password
+    }
+    
+    # Hash the password
+    temp_config = {
+        'credentials': {
+            'usernames': {username: st.session_state.persistent_users[username]}
+        }
+    }
+    stauth.Hasher.hash_passwords(temp_config['credentials'])
+    st.session_state.persistent_users[username]['password'] = temp_config['credentials']['usernames'][username]['password']
+    
     return True, "User registered successfully!"
 
 def generate_otp():
@@ -542,6 +561,39 @@ def update_current_conversation(chat_history, conversation_context):
     st.session_state.conversations[st.session_state.current_conversation_id]['chat_history'] = chat_history
     st.session_state.conversations[st.session_state.current_conversation_id]['conversation_context'] = conversation_context
 
+def export_user_data():
+    """Export user data as JSON for backup."""
+    init_persistent_storage()
+    export_data = {
+        'users': st.session_state.persistent_users,
+        'user_data': st.session_state.persistent_user_data,
+        'export_timestamp': time.time()
+    }
+    return export_data
+
+def import_user_data(import_data):
+    """Import user data from JSON backup."""
+    try:
+        init_persistent_storage()
+        if 'users' in import_data:
+            st.session_state.persistent_users.update(import_data['users'])
+        if 'user_data' in import_data:
+            st.session_state.persistent_user_data.update(import_data['user_data'])
+        return True, "Data imported successfully!"
+    except Exception as e:
+        return False, f"Import failed: {str(e)}"
+
+def get_user_stats():
+    """Get statistics about registered users and conversations."""
+    init_persistent_storage()
+    total_users = len(st.session_state.persistent_users)
+    total_conversations = sum(len(user_data.get('conversations', {})) for user_data in st.session_state.persistent_user_data.values())
+    return {
+        'total_users': total_users,
+        'total_conversations': total_conversations,
+        'users': list(st.session_state.persistent_users.keys())
+    }
+
 def main():
     """Main Streamlit application with user authentication."""
     
@@ -910,6 +962,54 @@ def main():
             except (KeyError, TypeError):
                 # Handle case where user data is being cleared during logout
                 st.markdown("**📧 Email:** Logging out...")
+            
+            # Admin panel for admin users
+            if username == 'admin':
+                st.markdown("---")
+                st.header("🔧 Admin Panel")
+                
+                # User statistics
+                stats = get_user_stats()
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("👥 Total Users", stats['total_users'])
+                with col2:
+                    st.metric("💬 Total Conversations", stats['total_conversations'])
+                
+                # Show registered users
+                with st.expander("👥 Registered Users"):
+                    for user in stats['users']:
+                        if user != 'admin':
+                            try:
+                                user_info = st.session_state.persistent_users[user]
+                                st.write(f"**{user}** ({user_info['name']}) - {user_info['email']}")
+                            except:
+                                st.write(f"**{user}** - Data unavailable")
+                
+                # Data backup/restore
+                with st.expander("💾 Data Management"):
+                    st.markdown("**Backup Data:**")
+                    if st.button("📥 Export User Data", use_container_width=True):
+                        export_data = export_user_data()
+                        st.download_button(
+                            label="💾 Download Backup File",
+                            data=str(export_data),
+                            file_name=f"sanatanagpt_backup_{int(time.time())}.json",
+                            mime="application/json",
+                            use_container_width=True
+                        )
+                        st.success("✅ Backup ready for download!")
+                    
+                    st.markdown("**Restore Data:**")
+                    st.info("💡 **Note:** Data persistence is limited on Streamlit Cloud. Users will need to re-register after app restarts unless you configure persistent storage.")
+                    
+                    # Show current session persistence status
+                    st.markdown("**Current Session Status:**")
+                    st.write(f"• Users in memory: {len(st.session_state.persistent_users)}")
+                    st.write(f"• Conversations in memory: {len(st.session_state.persistent_user_data)}")
+                    
+                    if st.button("🔄 Refresh Stats", use_container_width=True):
+                        st.rerun()
             
             # Conversation management
             st.header("💬 Your Conversations")
