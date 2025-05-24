@@ -1,0 +1,7 @@
+# Essential packages for Hindu Scriptures Q&A
+google-generativeai>=0.8.0
+streamlit>=1.28.0
+python-dotenv>=1.0.0
+
+# Optional: For future PDF support
+pypdf>=3.0.0 
