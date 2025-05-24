@@ -194,6 +194,25 @@ YOUR RESPONSE:"""
     except Exception as e:
         return f"Error generating answer: {str(e)}"
 
+def get_base_url():
+    """Get the base URL for the current Streamlit app (works for both local and cloud)."""
+    try:
+        # Try to detect if we're on Streamlit Cloud
+        import os
+        
+        # Check for Streamlit Cloud environment variables
+        if any(key in os.environ for key in ['STREAMLIT_SHARING_MODE', 'STREAMLIT_CLOUD', 'STREAMLIT_SERVER_PORT']):
+            # We're likely on Streamlit Cloud
+            # TODO: Replace this with your actual Streamlit Cloud URL after deployment
+            # Format: https://your-app-name-your-github-username.streamlit.app
+            return "https://sanatanagpt.streamlit.app"  # ⚠️ UPDATE THIS WITH YOUR ACTUAL URL
+        else:
+            # Local development
+            return "http://localhost:8501"
+    except:
+        # Fallback to localhost
+        return "http://localhost:8501"
+
 def generate_conversation_name(first_question):
     """Generate a short, meaningful name for the conversation based on the first question."""
     # Remove common prefixes
@@ -293,6 +312,22 @@ def main():
     st.session_state.setdefault('current_conversation_id', None)
     st.session_state.setdefault('conversation_counter', 0)
     st.session_state.setdefault('pending_example', None)
+    
+    # Handle URL parameters for shared conversation links
+    try:
+        # Get URL parameters
+        query_params = st.query_params
+        if 'conv' in query_params:
+            shared_conv_id = query_params['conv']
+            # If the conversation exists, switch to it
+            if shared_conv_id in st.session_state.conversations:
+                st.session_state.current_conversation_id = shared_conv_id
+                st.success(f"🔗 Opened shared conversation!")
+            else:
+                st.warning(f"⚠️ Shared conversation not found. It may have been deleted or doesn't exist yet.")
+    except Exception as e:
+        # Ignore URL parameter errors
+        pass
     
     # Header
     st.title("🕉️ Hindu Scriptures Q&A")
@@ -421,15 +456,24 @@ def main():
                             
                             with col2:
                                 if st.button("🔗 Copy Link", key=f"copy_exp_{conv_id}", use_container_width=True):
-                                    link = f"http://localhost:8501/?conv={conv_id}"
-                                    st.markdown(f"""
-                                    <script>
-                                    navigator.clipboard.writeText('{link}').then(function() {{
-                                        console.log('Link copied to clipboard');
-                                    }});
-                                    </script>
-                                    """, unsafe_allow_html=True)
-                                    st.toast("🔗 Link copied to clipboard!", icon="✅")
+                                    # Generate a shareable link
+                                    base_url = get_base_url()
+                                    link = f"{base_url}/?conv={conv_id}"
+                                    
+                                    # Show the link in a text input for easy copying
+                                    st.text_input(
+                                        "📋 Copy this link:",
+                                        value=link,
+                                        key=f"link_display_{conv_id}",
+                                        help="Select all text and copy (Ctrl+C or Cmd+C)"
+                                    )
+                                    st.success("✅ Link generated! Select the text above and copy it.")
+                                    
+                                    # Also show a markdown link for clicking
+                                    st.markdown(f"🔗 [Open conversation in new tab]({link})")
+                                else:
+                                    # Show a compact link preview when not clicked
+                                    st.caption("🔗 Get shareable link")
                             
                             with col3:
                                 if st.button("🗑️ Delete Chat", key=f"delete_exp_{conv_id}", use_container_width=True, type="secondary"):
