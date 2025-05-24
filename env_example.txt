@@ -1,0 +1,21 @@
+# SanatanaGPT Configuration File
+# Copy this content to a file named .env and fill in your actual values
+
+# Google Gemini AI API Key (Required)
+GOOGLE_API_KEY=your_google_api_key_here
+
+# Gmail Configuration for Email OTP (Required for user registration)
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SENDER_EMAIL=your.email@gmail.com
+SENDER_PASSWORD=your_16_character_app_password_here
+
+# Example with real format:
+# SENDER_EMAIL=sanatanagpt@gmail.com
+# SENDER_PASSWORD=abcdefghijklmnop
+
+# Instructions:
+# 1. Rename this file to .env (remove .txt extension)
+# 2. Replace your.email@gmail.com with your actual Gmail address
+# 3. Replace your_16_character_app_password_here with the app password from Google
+# 4. Keep SMTP_SERVER and SMTP_PORT as they are for Gmail 
