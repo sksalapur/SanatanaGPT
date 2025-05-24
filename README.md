@@ -1,186 +1,182 @@
-# 🕉️ Hindu Scriptures Q&A System
+# 🕉️ SanatanaGPT - Hindu Scriptures Q&A System
 
-A beautiful and intelligent web application that allows you to ask questions about Hindu scriptures and get AI-powered answers based on your text collection.
+An AI-powered question-answering system for Hindu scriptures, built with Streamlit and Google's Gemini AI. Ask questions about the Bhagavad Gita, Upanishads, Vedas, and other sacred texts in natural language.
 
 ## ✨ Features
 
-- **🤖 AI-Powered Answers**: Uses Google Gemini AI to provide intelligent responses
-- **📚 Multiple Scripture Support**: Load multiple Hindu text files (.txt format)
-- **🔍 Smart Search**: Finds relevant passages using advanced text matching
-- **🎨 Beautiful Interface**: Clean, modern Streamlit web interface
-- **⚡ Fast & Responsive**: Quick search and response generation
-- **📖 Source Citations**: Shows exactly which texts the answers come from
-- **💡 Example Questions**: Pre-built questions to get you started
+- 🤖 **AI-Powered Q&A**: Ask questions about Hindu scriptures in natural language
+- 📚 **Multiple Scripture Support**: Bhagavad Gita, Upanishads, Vedas, Puranas, and more
+- 💬 **Conversation Management**: Create, save, and manage multiple conversations
+- 🔗 **Shareable Links**: Generate links to share specific conversations
+- 👤 **User Authentication**: Secure registration and login with email OTP verification
+- 📊 **Source Citations**: See exact passages that answer your questions
+- 🎯 **Balanced Search**: Intelligent distribution across different texts
+- 📱 **Responsive Design**: Works on desktop and mobile devices
 
 ## 🚀 Quick Start
 
-### 1. Install Dependencies
+### 1. Clone the Repository
+```bash
+git clone https://github.com/YOUR_USERNAME/SanatanaGPT.git
+cd SanatanaGPT
+```
 
+### 2. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Set Up Your Google API Key
-
-1. Get a free Google API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Create a `.env` file in the project root:
-```
-GOOGLE_API_KEY=your_api_key_here
+### 3. Set Up Environment Variables
+```bash
+cp env_example.txt .env
 ```
 
-### 3. Add Your Hindu Scripture Texts
+Edit `.env` and add your credentials:
+```env
+# Google Gemini AI API Key (Required)
+GOOGLE_API_KEY=your_google_api_key_here
 
-Create a `hindu_texts/` directory and add your scripture files:
+# Gmail Configuration for Email OTP (Required for user registration)
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SENDER_EMAIL=your.email@gmail.com
+SENDER_PASSWORD=your_16_character_app_password_here
 ```
-hindu_texts/
-├── bhagavad_gita.txt
-├── upanishads.txt
-├── vedas.txt
-└── ... (any .txt files)
-```
-
-**Supported formats**: `.txt` files with UTF-8 encoding
 
 ### 4. Run the Application
-
 ```bash
 streamlit run app.py
 ```
 
-Then open your browser to `http://localhost:8501`
+## 🔑 Getting API Keys
+
+### Google Gemini AI API Key
+1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Sign in with your Google account
+3. Click "Create API Key"
+4. Copy the generated key to your `.env` file
+
+### Gmail App Password (for OTP emails)
+1. Enable 2-Factor Authentication on your Google account
+2. Go to [App Passwords](https://myaccount.google.com/apppasswords)
+3. Generate a new app password for "Mail"
+4. Use this 16-character password in your `.env` file
 
 ## 📁 Project Structure
 
 ```
 SanatanaGPT/
-├── app.py                          # Main Streamlit application
-├── requirements.txt                # Python dependencies
-├── .env                           # Your Google API key (create this)
-├── README.md                      # This file
-├── .gitignore                     # Git ignore rules
-│
-├── hindu_texts/                   # Your scripture text files
-│   ├── sample_bhagavad_gita.txt
-│   ├── sample_upanishads.txt
-│   └── ... (add your .txt files here)
-│
-├── config/                        # Configuration files
-│   ├── env_example.txt           # Environment template
-│   ├── secrets_template.toml     # Streamlit secrets template
-│   └── .streamlit/               # Streamlit configuration
-│       └── config.toml
-│
-├── scripts/                       # Utility scripts
-│   ├── setup.py                 # Automated setup script
-│   └── text_processor.py        # Text processing utilities
-│
-└── docs/                         # Documentation
-    ├── INSTALLATION.md           # Detailed installation guide
-    └── API_GUIDE.md             # Google Gemini API guide
+├── app.py                      # Main Streamlit application
+├── requirements.txt            # Python dependencies
+├── env_example.txt            # Environment variables template
+├── users_config.yaml          # User authentication config
+├── .gitignore                 # Git ignore rules
+├── README.md                  # This file
+├── hindu_texts/               # Scripture text files
+│   ├── bhagavad_gita.txt
+│   ├── upanishads.txt
+│   └── ...
+├── docs/                      # Documentation
+│   ├── API_GUIDE.md          # API usage guide
+│   └── INSTALLATION.md       # Detailed installation guide
+├── config/                    # Configuration files
+│   ├── secrets_template.toml # Streamlit secrets template
+│   └── .streamlit/
+│       └── config.toml       # Streamlit configuration
+└── .devcontainer/            # VS Code dev container config
 ```
 
-## 📚 Documentation
+## 📚 Adding Scripture Texts
 
-- **[📖 Installation Guide](docs/INSTALLATION.md)** - Complete setup instructions
-- **[🤖 API Guide](docs/API_GUIDE.md)** - Google Gemini integration details
-- **[🔧 Text Processing](scripts/text_processor.py)** - Utilities for scripture files
+1. Place your Hindu scripture text files in the `hindu_texts/` directory
+2. Use `.txt` format with UTF-8 encoding
+3. Name files descriptively (e.g., `bhagavad_gita.txt`, `upanishads.txt`)
 
-## 💡 Usage Examples
+## ☁️ Deployment
 
-### Example Questions You Can Ask:
+### Streamlit Cloud
+1. Fork this repository to your GitHub
+2. Go to [share.streamlit.io](https://share.streamlit.io)
+3. Connect your GitHub account and select your repository
+4. Set main file as `app.py`
+5. Add your environment variables in App Settings → Secrets:
+   ```toml
+   GOOGLE_API_KEY = "your_api_key_here"
+   SENDER_EMAIL = "your.email@gmail.com"
+   SENDER_PASSWORD = "your_app_password"
+   ```
 
-- "What is dharma according to the Bhagavad Gita?"
-- "What does Om represent in Hindu philosophy?"
-- "What is karma and how does it work?"
-- "What are the four goals of human life?"
-- "What is the nature of the soul (Atman)?"
-- "What does Krishna teach about duty?"
-- "What is meditation according to the Vedas?"
-- "What is the path to liberation (moksha)?"
-
-### How It Works:
-
-1. **Text Loading**: The app loads all `.txt` files from your `hindu_texts/` directory
-2. **Smart Search**: When you ask a question, it searches for relevant passages
-3. **AI Analysis**: Google Gemini AI analyzes the passages and generates a comprehensive answer
-4. **Source Display**: Shows you exactly which texts and passages the answer comes from
-
-## 🛠️ Technical Details
-
-- **Frontend**: Streamlit (Python web framework)
-- **AI Model**: Google Gemini 1.5 Flash
-- **Text Processing**: Custom relevance scoring algorithm
-- **Search**: Keyword-based passage retrieval
-- **Caching**: Streamlit caching for fast performance
-
-## ☁️ Streamlit Cloud Deployment
-
-Deploy your app to Streamlit Cloud for free:
-
-1. **Push to GitHub** (this repository)
-2. **Go to [share.streamlit.io](https://share.streamlit.io)**
-3. **Connect your GitHub account**
-4. **Deploy the app** using `app.py`
-5. **Add your Google API key** in App Settings → Secrets
-
-**Detailed deployment guide**: [docs/INSTALLATION.md](docs/INSTALLATION.md)
-
-## 🔧 Utility Scripts
-
-### Automated Setup
+### Local Development
 ```bash
-python scripts/setup.py
+streamlit run app.py
 ```
-Automatically installs dependencies, creates config files, and sets up the project.
 
-### Text Processing
-```bash
-python scripts/text_processor.py
-```
-Analyzes your Hindu scripture files and generates processing reports.
+## 🔧 Configuration
 
-## 📋 Requirements
+### Streamlit Configuration
+The app includes optimized Streamlit settings in `config/.streamlit/config.toml`:
+- Wide layout mode
+- Dark theme
+- Optimized caching
+- Performance improvements
 
+### User Authentication
+- File-based user storage using `users_config.yaml`
+- Email OTP verification for new registrations
+- Secure password hashing with bcrypt
+- Session-based authentication
+
+## 🛠️ Development
+
+### Requirements
 - Python 3.8+
-- Google API key (free tier available)
-- Internet connection for AI API calls
-- Hindu scripture text files (.txt format)
+- Streamlit
+- Google Generative AI
+- Streamlit Authenticator
+- Other dependencies in `requirements.txt`
 
-## 🎯 Tips for Best Results
+### Key Components
+- **Authentication**: User registration, login, OTP verification
+- **Text Processing**: Scripture text loading and chunking
+- **AI Integration**: Google Gemini API for Q&A
+- **Conversation Management**: Save, load, and share conversations
+- **UI/UX**: Responsive Streamlit interface
 
-1. **Quality Text Files**: Use well-formatted, clean text files
-2. **Specific Questions**: Ask specific questions for better results
-3. **Use Keywords**: Include relevant Sanskrit terms or concepts
-4. **Multiple Files**: Add multiple scripture files for comprehensive answers
+## 📖 Usage
 
-## 🔍 Troubleshooting
+1. **Register/Login**: Create an account or log in with existing credentials
+2. **Ask Questions**: Type your question about Hindu scriptures
+3. **Get Answers**: Receive AI-generated answers with source citations
+4. **Manage Conversations**: Create, rename, and organize your conversations
+5. **Share**: Generate shareable links for specific conversations
 
-### Common Issues:
+## 🤝 Contributing
 
-1. **"GOOGLE_API_KEY not found"**
-   - Make sure you have a `.env` file with your API key
-   - Get your key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-2. **"No .txt files found"**
-   - Add Hindu scripture text files to the `hindu_texts/` directory
-   - Make sure files have `.txt` extension
+## 📄 License
 
-3. **Import Errors**
-   - Run `python scripts/setup.py` for automated setup
-   - Or manually: `pip install -r requirements.txt`
-
-**Full troubleshooting guide**: [docs/INSTALLATION.md](docs/INSTALLATION.md)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
-- **Google Gemini AI**: For intelligent text analysis and response generation
-- **Streamlit**: For the beautiful and easy-to-use web interface
-- **Hindu Scripture Authors**: For the timeless wisdom contained in these texts
+- **Hindu Scriptures**: Ancient wisdom texts that inspire this project
+- **Google Gemini AI**: Powerful AI capabilities for understanding and answering questions
+- **Streamlit**: Amazing framework for building data applications
+- **Open Source Community**: For the tools and libraries that make this possible
 
-## 📜 License
+## 📞 Support
 
-This project is open source and available under the MIT License.
+For support, please:
+1. Check the [Installation Guide](docs/INSTALLATION.md)
+2. Review the [API Guide](docs/API_GUIDE.md)
+3. Create an issue on GitHub
+4. Include error messages and system information
 
 ---
 
-*🕉️ May this tool help spread the wisdom and knowledge of Hindu scriptures to seekers around the world. 🕉️* 
+*🕉️ May this tool help you explore the profound wisdom of Hindu scriptures! 🕉️* 
