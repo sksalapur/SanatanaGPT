@@ -18,6 +18,13 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email_validator import validate_email, EmailNotValidError
 
+# PDF support
+try:
+    from pypdf import PdfReader
+    PDF_SUPPORT = True
+except ImportError:
+    PDF_SUPPORT = False
+
 # Load environment variables
 load_dotenv()
 
@@ -274,23 +281,35 @@ def setup_gemini():
 
 @st.cache_data
 def load_hindu_texts():
-    """Load all text files from hindu_texts directory."""
+    """Load all text and PDF files from hindu_texts directory."""
     texts = {}
     texts_dir = Path("hindu_texts")
     
     if not texts_dir.exists():
         st.error("❌ hindu_texts directory not found!")
-        st.info("Please create a 'hindu_texts' directory and add your scripture files (.txt)")
+        st.info("Please create a 'hindu_texts' directory and add your scripture files (.txt or .pdf)")
         return {}
     
     # Load .txt files
     txt_files = list(texts_dir.glob("*.txt"))
     
-    if not txt_files:
-        st.warning("⚠️ No .txt files found in hindu_texts directory")
-        st.info("Please add some Hindu scripture text files (.txt) to the hindu_texts folder")
+    # Load .pdf files if PDF support is available
+    pdf_files = []
+    if PDF_SUPPORT:
+        pdf_files = list(texts_dir.glob("*.pdf"))
+    
+    all_files = txt_files + pdf_files
+    
+    if not all_files:
+        if PDF_SUPPORT:
+            st.warning("⚠️ No .txt or .pdf files found in hindu_texts directory")
+            st.info("Please add some Hindu scripture files (.txt or .pdf) to the hindu_texts folder")
+        else:
+            st.warning("⚠️ No .txt files found in hindu_texts directory")
+            st.info("Please add some Hindu scripture text files (.txt) to the hindu_texts folder")
         return {}
     
+    # Process text files
     for file_path in txt_files:
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -299,6 +318,31 @@ def load_hindu_texts():
                     texts[file_path.name] = content
         except Exception as e:
             st.warning(f"⚠️ Could not read {file_path.name}: {str(e)}")
+    
+    # Process PDF files
+    for file_path in pdf_files:
+        try:
+            reader = PdfReader(file_path)
+            content = ""
+            
+            # Extract text from all pages
+            for page_num, page in enumerate(reader.pages):
+                try:
+                    page_text = page.extract_text()
+                    if page_text.strip():
+                        content += f"\n\n--- Page {page_num + 1} ---\n\n"
+                        content += page_text
+                except Exception as e:
+                    st.warning(f"⚠️ Could not read page {page_num + 1} from {file_path.name}: {str(e)}")
+                    continue
+            
+            if content.strip():  # Only add non-empty files
+                texts[file_path.name] = content.strip()
+            else:
+                st.warning(f"⚠️ No readable text found in {file_path.name}")
+                
+        except Exception as e:
+            st.warning(f"⚠️ Could not read PDF {file_path.name}: {str(e)}")
     
     return texts
 
@@ -832,9 +876,30 @@ def main():
         
         # Sidebar
         with st.sidebar:
-            st.header("📚 Available Texts")
-            for filename in texts.keys():
-                st.write(f"• {filename}")
+            st.header("�� Available Texts")
+            
+            # Show file type breakdown
+            txt_files = [f for f in texts.keys() if f.endswith('.txt')]
+            pdf_files = [f for f in texts.keys() if f.endswith('.pdf')]
+            
+            if txt_files:
+                st.markdown(f"**📄 Text Files ({len(txt_files)}):**")
+                for filename in txt_files:
+                    st.write(f"• {filename}")
+            
+            if pdf_files:
+                st.markdown(f"**📕 PDF Files ({len(pdf_files)}):**")
+                for filename in pdf_files:
+                    st.write(f"• {filename}")
+            
+            # Show supported formats info
+            if PDF_SUPPORT:
+                st.info("💡 **Supported formats:** .txt and .pdf files")
+            else:
+                st.info("💡 **Supported formats:** .txt files only")
+                st.caption("Install pypdf to enable PDF support")
+            
+            st.caption(f"📊 Total: {len(texts)} scripture files loaded")
             
             # User info
             st.markdown("---")
