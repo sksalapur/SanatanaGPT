@@ -20,10 +20,28 @@ st.set_page_config(
 @st.cache_resource
 def setup_gemini():
     """Setup Google Gemini API."""
-    api_key = os.getenv("GOOGLE_API_KEY")
+    # Try to get API key from Streamlit secrets first (for cloud deployment)
+    api_key = None
+    
+    # Check Streamlit secrets (for cloud deployment)
+    if hasattr(st, 'secrets') and 'GOOGLE_API_KEY' in st.secrets:
+        api_key = st.secrets['GOOGLE_API_KEY']
+    # Fallback to environment variable (for local development)
+    elif os.getenv("GOOGLE_API_KEY"):
+        api_key = os.getenv("GOOGLE_API_KEY")
+    
     if not api_key:
-        st.error("❌ GOOGLE_API_KEY not found in .env file")
-        st.info("Please add your Google API key to the .env file")
+        st.error("❌ GOOGLE_API_KEY not found")
+        st.info("""
+        **For local development:** Add your Google API key to the .env file
+        
+        **For Streamlit Cloud:** Add your API key in App Settings > Secrets:
+        ```
+        GOOGLE_API_KEY = "your_api_key_here"
+        ```
+        
+        Get your free API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+        """)
         st.stop()
     
     try:
