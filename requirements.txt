@@ -2,6 +2,9 @@
 google-generativeai>=0.8.0
 streamlit>=1.28.0
 python-dotenv>=1.0.0
+pathlib
+streamlit-authenticator
+pyyaml
 
 # Optional: For future PDF support
 pypdf>=3.0.0 
