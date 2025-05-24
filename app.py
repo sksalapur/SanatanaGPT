@@ -876,7 +876,7 @@ def main():
         
         # Sidebar
         with st.sidebar:
-            st.header("�� Available Texts")
+            st.header("📚 Available Texts")
             
             # Show file type breakdown
             txt_files = [f for f in texts.keys() if f.endswith('.txt')]
@@ -901,10 +901,15 @@ def main():
             
             st.caption(f"📊 Total: {len(texts)} scripture files loaded")
             
-            # User info
+            # User info - protect against KeyError during logout
             st.markdown("---")
             st.markdown(f"**👤 Logged in as:** {name}")
-            st.markdown(f"**📧 Email:** {config['credentials']['usernames'][username]['email']}")
+            try:
+                user_email = config['credentials']['usernames'][username]['email']
+                st.markdown(f"**📧 Email:** {user_email}")
+            except (KeyError, TypeError):
+                # Handle case where user data is being cleared during logout
+                st.markdown("**📧 Email:** Logging out...")
             
             # Conversation management
             st.header("💬 Your Conversations")
