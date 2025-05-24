@@ -989,45 +989,72 @@ def main():
                     # Show registered users
                     with st.expander("👥 Registered Users", expanded=True):
                         st.markdown("**All registered users:**")
+                        
+                        # Debug information
+                        st.markdown("**Debug Info:**")
+                        st.write(f"• Total users in persistent_users: {len(st.session_state.persistent_users)}")
+                        st.write(f"• Users list from stats: {stats['users']}")
+                        st.write(f"• Raw persistent_users keys: {list(st.session_state.persistent_users.keys())}")
+                        
+                        # Show all users including admin
+                        st.markdown("**All Users (including admin):**")
                         for user in stats['users']:
-                            if user != 'sksalapur':
+                            try:
+                                user_info = st.session_state.persistent_users[user]
+                                if user == 'sksalapur':
+                                    st.write(f"🔧 **{user}** ({user_info['name']}) - {user_info['email']} [ADMIN]")
+                                else:
+                                    st.write(f"👤 **{user}** ({user_info['name']}) - {user_info['email']}")
+                            except Exception as e:
+                                st.write(f"❌ **{user}** - Error: {str(e)}")
+                        
+                        # Show non-admin users separately
+                        st.markdown("**Regular Users Only:**")
+                        non_admin_users = [user for user in stats['users'] if user != 'sksalapur']
+                        if non_admin_users:
+                            for user in non_admin_users:
                                 try:
                                     user_info = st.session_state.persistent_users[user]
-                                    st.write(f"**{user}** ({user_info['name']}) - {user_info['email']}")
-                                except:
-                                    st.write(f"**{user}** - Data unavailable")
+                                    st.write(f"👤 **{user}** ({user_info['name']}) - {user_info['email']}")
+                                except Exception as e:
+                                    st.write(f"❌ **{user}** - Error: {str(e)}")
+                        else:
+                            st.info("No regular users registered yet.")
                         
-                        if len(stats['users']) == 1:  # Only admin
-                            st.info("No other users registered yet.")
-                    
-                    # Data backup/restore
-                    with st.expander("💾 Data Management", expanded=True):
-                        st.markdown("**Backup Data:**")
-                        if st.button("📥 Export User Data", use_container_width=True):
-                            export_data = export_user_data()
-                            st.download_button(
-                                label="💾 Download Backup File",
-                                data=str(export_data),
-                                file_name=f"sanatanagpt_backup_{int(time.time())}.json",
-                                mime="application/json",
-                                use_container_width=True
-                            )
-                            st.success("✅ Backup ready for download!")
-                        
-                        st.markdown("**Restore Data:**")
-                        st.info("💡 **Note:** Data persistence is limited on Streamlit Cloud. Users will need to re-register after app restarts unless you configure persistent storage.")
-                        
-                        # Show current session persistence status
-                        st.markdown("**Current Session Status:**")
-                        st.write(f"• Users in memory: {len(st.session_state.persistent_users)}")
-                        st.write(f"• Conversations in memory: {len(st.session_state.persistent_user_data)}")
-                        
-                        if st.button("🔄 Refresh Stats", use_container_width=True):
+                        # Force refresh button
+                        if st.button("🔄 Force Refresh User Data", use_container_width=True):
+                            # Clear any cached data and reinitialize
+                            init_persistent_storage()
                             st.rerun()
                 
                 except Exception as e:
                     st.error(f"Admin panel error: {e}")
                     st.info("Try refreshing the page or logging out and back in.")
+            
+            # Data backup/restore
+            with st.expander("💾 Data Management", expanded=True):
+                st.markdown("**Backup Data:**")
+                if st.button("📥 Export User Data", use_container_width=True):
+                    export_data = export_user_data()
+                    st.download_button(
+                        label="💾 Download Backup File",
+                        data=str(export_data),
+                        file_name=f"sanatanagpt_backup_{int(time.time())}.json",
+                        mime="application/json",
+                        use_container_width=True
+                    )
+                    st.success("✅ Backup ready for download!")
+                
+                st.markdown("**Restore Data:**")
+                st.info("💡 **Note:** Data persistence is limited on Streamlit Cloud. Users will need to re-register after app restarts unless you configure persistent storage.")
+                
+                # Show current session persistence status
+                st.markdown("**Current Session Status:**")
+                st.write(f"• Users in memory: {len(st.session_state.persistent_users)}")
+                st.write(f"• Conversations in memory: {len(st.session_state.persistent_user_data)}")
+                
+                if st.button("🔄 Refresh Stats", use_container_width=True):
+                    st.rerun()
             
             # Conversation management
             st.header("💬 Your Conversations")
