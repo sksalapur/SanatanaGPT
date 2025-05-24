@@ -403,7 +403,15 @@ def main():
     )
     
     # Authentication widget
-    name, authentication_status, username = authenticator.login(location='main')
+    try:
+        authenticator.login(location='main')
+    except Exception as e:
+        st.error(e)
+    
+    # Get authentication status from session state
+    name = st.session_state.get('name')
+    authentication_status = st.session_state.get('authentication_status')
+    username = st.session_state.get('username')
     
     if authentication_status == False:
         st.error('Username/password is incorrect')
@@ -496,8 +504,11 @@ def main():
         with col2:
             st.write(f"Welcome, **{name}**!")
             if st.button("🚪 Logout"):
-                authenticator.logout(location='main')
-                st.rerun()
+                try:
+                    authenticator.logout(location='main')
+                    st.rerun()
+                except Exception as e:
+                    st.error(e)
         
         # Setup Gemini
         model = setup_gemini()
