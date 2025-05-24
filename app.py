@@ -574,6 +574,16 @@ def main():
     authentication_status = st.session_state.get('authentication_status')
     username = st.session_state.get('username')
     
+    # Clean up user-specific session state if not authenticated
+    if authentication_status != True:
+        user_keys_to_clear = [
+            'conversations', 'current_conversation_id', 'conversation_counter', 
+            'user_question', 'pending_example', 'username'
+        ]
+        for key in user_keys_to_clear:
+            if key in st.session_state:
+                del st.session_state[key]
+    
     if authentication_status == False:
         st.error('Username/password is incorrect')
         
@@ -847,22 +857,31 @@ def main():
                 # Save user data before logout
                 save_current_user_data()
                 
-                # Clear all session state related to user data
-                for key in list(st.session_state.keys()):
-                    if key in ['conversations', 'current_conversation_id', 'conversation_counter', 
-                              'user_question', 'pending_example', 'username', 'pending_users', 
-                              'otp_verification_email']:
-                        del st.session_state[key]
-                
-                # Perform logout
+                # Perform logout first
                 try:
                     authenticator.logout(location='main')
                 except Exception as e:
                     st.error(f"Logout error: {e}")
                 
-                # Force page refresh
+                # Clear ALL session state to ensure clean logout
+                keys_to_clear = [
+                    'conversations', 'current_conversation_id', 'conversation_counter', 
+                    'user_question', 'pending_example', 'username', 'pending_users', 
+                    'otp_verification_email', 'name', 'authentication_status',
+                    'persistent_users', 'persistent_user_data'
+                ]
+                
+                for key in keys_to_clear:
+                    if key in st.session_state:
+                        del st.session_state[key]
+                
+                # Clear any remaining authentication-related keys
+                auth_keys = [k for k in st.session_state.keys() if 'auth' in k.lower() or 'login' in k.lower()]
+                for key in auth_keys:
+                    del st.session_state[key]
+                
+                # Show success message and force immediate refresh
                 st.success("✅ Logged out successfully!")
-                time.sleep(1)
                 st.rerun()
         
         # Setup Gemini
