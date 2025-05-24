@@ -2,15 +2,11 @@
 google-generativeai>=0.8.0
 streamlit>=1.28.0
 python-dotenv>=1.0.0
-pathlib
 streamlit-authenticator
 pyyaml
 
 # Email functionality for OTP verification
-smtplib
 email-validator
-random
-datetime
 
 # Optional: For future PDF support
 pypdf>=3.0.0 
