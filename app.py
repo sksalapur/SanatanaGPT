@@ -779,6 +779,15 @@ def main():
         st.session_state.setdefault('pending_example', None)
         st.session_state.username = username
         
+        # Save user data function
+        def save_current_user_data():
+            user_data[username] = {
+                'conversations': st.session_state.conversations,
+                'current_conversation_id': st.session_state.current_conversation_id,
+                'conversation_counter': st.session_state.conversation_counter
+            }
+            save_user_data(user_data)
+        
         # Header with logout
         col1, col2 = st.columns([3, 1])
         with col1:
@@ -787,11 +796,25 @@ def main():
         with col2:
             st.write(f"Welcome, **{name}**!")
             if st.button("🚪 Logout"):
+                # Save user data before logout
+                save_current_user_data()
+                
+                # Clear all session state related to user data
+                for key in list(st.session_state.keys()):
+                    if key in ['conversations', 'current_conversation_id', 'conversation_counter', 
+                              'user_question', 'pending_example', 'username', 'pending_users', 
+                              'otp_verification_email']:
+                        del st.session_state[key]
+                
+                # Perform logout
                 try:
                     authenticator.logout(location='main')
                 except Exception as e:
-                    st.error(e)
-                # Always rerun after logout attempt
+                    st.error(f"Logout error: {e}")
+                
+                # Force page refresh
+                st.success("✅ Logged out successfully!")
+                time.sleep(1)
                 st.rerun()
         
         # Setup Gemini
@@ -806,15 +829,6 @@ def main():
             st.stop()
         
         st.success(f"✅ Loaded {len(texts)} scripture files")
-        
-        # Save user data function
-        def save_current_user_data():
-            user_data[username] = {
-                'conversations': st.session_state.conversations,
-                'current_conversation_id': st.session_state.current_conversation_id,
-                'conversation_counter': st.session_state.conversation_counter
-            }
-            save_user_data(user_data)
         
         # Sidebar
         with st.sidebar:
