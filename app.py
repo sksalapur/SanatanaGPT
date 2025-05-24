@@ -403,7 +403,7 @@ def main():
     )
     
     # Authentication widget
-    name, authentication_status, username = authenticator.login('Login to SanatanaGPT', 'main')
+    name, authentication_status, username = authenticator.login(location='main')
     
     if authentication_status == False:
         st.error('Username/password is incorrect')
@@ -496,7 +496,7 @@ def main():
         with col2:
             st.write(f"Welcome, **{name}**!")
             if st.button("🚪 Logout"):
-                authenticator.logout('Logout', 'main')
+                authenticator.logout(location='main')
                 st.rerun()
         
         # Setup Gemini
