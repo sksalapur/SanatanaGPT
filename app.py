@@ -32,89 +32,77 @@ load_dotenv()
 USER_DATA_FILE = "user_data.pkl"
 USERS_CONFIG_FILE = "users_config.yaml"
 
-# Initialize persistent storage
-def init_persistent_storage():
-    """Initialize persistent storage using session state and secrets."""
-    if 'persistent_users' not in st.session_state:
-        # Try to load from secrets first (for pre-configured users)
-        try:
-            if hasattr(st, 'secrets') and 'users' in st.secrets:
-                st.session_state.persistent_users = dict(st.secrets['users'])
-            else:
-                # Start with empty users - no default admin
-                st.session_state.persistent_users = {}
-        except Exception:
-            # Fallback to empty users
-            st.session_state.persistent_users = {}
-    
-    if 'persistent_user_data' not in st.session_state:
-        st.session_state.persistent_user_data = {}
-
 def load_user_data():
-    """Load user conversation data from session state."""
-    init_persistent_storage()
-    return st.session_state.persistent_user_data
+    """Load user conversation data from file."""
+    try:
+        with open(USER_DATA_FILE, 'rb') as f:
+            return pickle.load(f)
+    except FileNotFoundError:
+        return {}
+    except Exception as e:
+        st.error(f"Error loading user data: {e}")
+        return {}
 
 def save_user_data(user_data):
-    """Save user conversation data to session state."""
-    init_persistent_storage()
-    st.session_state.persistent_user_data = user_data
+    """Save user conversation data to file."""
+    try:
+        with open(USER_DATA_FILE, 'wb') as f:
+            pickle.dump(user_data, f)
+        return True
+    except Exception as e:
+        st.error(f"Error saving user data: {e}")
+        return False
 
 def create_users_config():
     """Create initial users configuration."""
-    init_persistent_storage()
+    # Try to load from YAML file first
+    try:
+        with open(USERS_CONFIG_FILE, 'r') as file:
+            config = yaml.safe_load(file)
+            if config is None:
+                config = {}
+    except FileNotFoundError:
+        config = {}
     
-    # Create config from persistent storage
-    config = {
-        'credentials': {
-            'usernames': {}
-        },
-        'cookie': {
+    # Ensure all required sections exist
+    if 'credentials' not in config:
+        config['credentials'] = {'usernames': {}}
+    if 'cookie' not in config:
+        config['cookie'] = {
             'expiry_days': 30,
             'key': 'sanatana_gpt_auth',
             'name': 'sanatana_gpt_cookie'
-        },
-        'preauthorized': {
-            'emails': []
         }
-    }
-    
-    # Copy users from persistent storage
-    for username, user_info in st.session_state.persistent_users.items():
-        config['credentials']['usernames'][username] = user_info.copy()
-    
-    # Hash passwords if they aren't already hashed
-    for username, user_info in config['credentials']['usernames'].items():
-        if not user_info['password'].startswith('$2b$'):
-            # Password needs to be hashed
-            temp_config = {'credentials': {'usernames': {username: user_info}}}
-            stauth.Hasher.hash_passwords(temp_config['credentials'])
-            config['credentials']['usernames'][username]['password'] = temp_config['credentials']['usernames'][username]['password']
-            # Update persistent storage with hashed password
-            st.session_state.persistent_users[username]['password'] = config['credentials']['usernames'][username]['password']
+    if 'preauthorized' not in config:
+        config['preauthorized'] = {'emails': []}
     
     return config
 
 def load_users_config():
-    """Load users configuration from session state."""
+    """Load users configuration from YAML file."""
     return create_users_config()
 
 def save_users_config(config):
-    """Save users configuration to session state."""
-    init_persistent_storage()
-    # Update persistent storage
-    st.session_state.persistent_users = config['credentials']['usernames'].copy()
+    """Save users configuration to YAML file."""
+    try:
+        with open(USERS_CONFIG_FILE, 'w') as file:
+            yaml.safe_dump(config, file, default_flow_style=False)
+        return True
+    except Exception as e:
+        st.error(f"Error saving user configuration: {e}")
+        return False
 
 def register_new_user(username, name, email, password):
-    """Register a new user in persistent storage."""
-    init_persistent_storage()
+    """Register a new user and save to YAML file."""
+    # Load current config
+    config = load_users_config()
     
     # Check if username already exists
-    if username in st.session_state.persistent_users:
+    if username in config['credentials']['usernames']:
         return False, "Username already exists"
     
     # Add new user
-    st.session_state.persistent_users[username] = {
+    config['credentials']['usernames'][username] = {
         'email': email,
         'name': name,
         'password': password
@@ -123,13 +111,17 @@ def register_new_user(username, name, email, password):
     # Hash the password
     temp_config = {
         'credentials': {
-            'usernames': {username: st.session_state.persistent_users[username]}
+            'usernames': {username: config['credentials']['usernames'][username]}
         }
     }
     stauth.Hasher.hash_passwords(temp_config['credentials'])
-    st.session_state.persistent_users[username]['password'] = temp_config['credentials']['usernames'][username]['password']
+    config['credentials']['usernames'][username]['password'] = temp_config['credentials']['usernames'][username]['password']
     
-    return True, "User registered successfully!"
+    # Save to file
+    if save_users_config(config):
+        return True, "User registered successfully!"
+    else:
+        return False, "Failed to save user data"
 
 def generate_otp():
     """Generate a 6-digit OTP."""
@@ -867,8 +859,7 @@ def main():
                 keys_to_clear = [
                     'conversations', 'current_conversation_id', 'conversation_counter', 
                     'user_question', 'pending_example', 'username', 'pending_users', 
-                    'otp_verification_email', 'name', 'authentication_status',
-                    'persistent_users', 'persistent_user_data'
+                    'otp_verification_email', 'name', 'authentication_status'
                 ]
                 
                 for key in keys_to_clear:
