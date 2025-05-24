@@ -42,7 +42,7 @@ def create_users_config():
     """Create initial users configuration file."""
     if not os.path.exists(USERS_CONFIG_FILE):
         # Create default admin user
-        hashed_passwords = stauth.Hasher(['admin123']).generate()
+        hashed_passwords = stauth.Hasher().generate(['admin123'])
         
         config = {
             'credentials': {
@@ -97,7 +97,7 @@ def register_new_user(username, name, email, password):
         return False, "Username already exists"
     
     # Hash password
-    hashed_password = stauth.Hasher([password]).generate()[0]
+    hashed_password = stauth.Hasher().generate([password])[0]
     
     # Add new user
     config['credentials']['usernames'][username] = {
