@@ -50,38 +50,9 @@ except Exception as e:
 # Database-based user management functions (replacing old file-based ones)
 def register_new_user(username, name, email, password):
     """Register a new user using the database."""
-    return register_user(username, name, email, password)
-    """Register a new user and save to YAML file."""
-    # Load current config
-    config = load_users_config()
-    
-    # Check if username already exists
-    if username in config['credentials']['usernames']:
-        return False, "Username already exists"
-    
-    # Add new user
-    config['credentials']['usernames'][username] = {
-        'email': email,
-        'name': name,
-        'password': password
-    }
-    
-    # Hash the password
-    temp_config = {
-        'credentials': {
-            'usernames': {username: config['credentials']['usernames'][username]}
-        }
-    }
-    stauth.Hasher.hash_passwords(temp_config['credentials'])
-    config['credentials']['usernames'][username]['password'] = temp_config['credentials']['usernames'][username]['password']
-    
-    # Save to file
-    if save_users_config(config):
-        return True, "User registered successfully!"
-    else:
-        return False, "Failed to save user data"
-
-def generate_otp():
+    def register_new_user(username, name, email, password):
+        """Register a new user using the database only."""
+        return register_user(username, name, email, password)
     """Generate a 6-digit OTP."""
     return ''.join(random.choices(string.digits, k=6))
 
