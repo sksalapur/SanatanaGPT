@@ -47,6 +47,12 @@ except Exception as e:
     st.error(f"Database startup error: {e}")
     st.stop()
 
+# --- Utility function for OTP generation ---
+def generate_otp():
+    """Generate a 6-digit OTP."""
+    import random
+    return ''.join(random.choices('0123456789', k=6))
+
 # Database-based user management functions (replacing old file-based ones)
 def register_new_user(username, name, email, password):
     """Register a new user using the database."""
@@ -1331,4 +1337,4 @@ def main():
         """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
-    main() 
+    main()
