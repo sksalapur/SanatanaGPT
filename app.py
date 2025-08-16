@@ -55,12 +55,11 @@ def generate_otp():
 
 # Database-based user management functions (replacing old file-based ones)
 def register_new_user(username, name, email, password):
-    """Register a new user using the database."""
-    def register_new_user(username, name, email, password):
-        """Register a new user using the database only."""
+    """Register a new user using the database only, with robust error handling."""
+    try:
         return register_user(username, name, email, password)
-    """Generate a 6-digit OTP."""
-    return ''.join(random.choices(string.digits, k=6))
+    except Exception as e:
+        return False, f"Registration error: {e}"
 
 def send_otp_email(email, otp, name):
     """Send OTP via email."""
