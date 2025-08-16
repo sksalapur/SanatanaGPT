@@ -322,6 +322,38 @@ def update_conversation_title(user_id: int, conversation_id: str, title: str) ->
         session.close()
 
 # Migration helpers (for transitioning from old system)
+def register_user_with_existing_hash(username: str, name: str, email: str, hashed_password: str) -> tuple[bool, str]:
+    """Register a user with an already-hashed password (for migration only)."""
+    session = get_db_session()
+    try:
+        # Check if username already exists
+        existing_user = session.query(User).filter(User.username == username).first()
+        if existing_user:
+            return False, "Username already exists"
+        
+        # Check if email already exists
+        existing_email = session.query(User).filter(User.email == email.lower()).first()
+        if existing_email:
+            return False, "Email already registered"
+        
+        # Create user with existing hash (don't hash again)
+        new_user = User(
+            username=username,
+            name=name,
+            email=email.lower(),
+            hashed_password=hashed_password
+        )
+        
+        session.add(new_user)
+        session.commit()
+        return True, "User migrated successfully!"
+        
+    except Exception as e:
+        session.rollback()
+        return False, f"Migration failed: {str(e)}"
+    finally:
+        session.close()
+
 def migrate_old_data_if_needed():
     """Migrate data from old .pkl and .yaml files if they exist."""
     try:
@@ -348,12 +380,24 @@ def migrate_old_data_if_needed():
                     for username, user_data in config['credentials']['usernames'].items():
                         # Check if user already exists in new database
                         if not get_user_by_username(username):
-                            register_user(
-                                username=username,
-                                name=user_data.get('name', username),
-                                email=user_data.get('email', f"{username}@migrated.local"),
-                                password=user_data.get('password', 'migration_placeholder')
-                            )
+                            password = user_data.get('password', 'migration_placeholder')
+                            # Check if password is already a bcrypt hash
+                            if password.startswith('$2b$') or password.startswith('$2a$') or password.startswith('$2y$'):
+                                # Password is already hashed, use migration function
+                                register_user_with_existing_hash(
+                                    username=username,
+                                    name=user_data.get('name', username),
+                                    email=user_data.get('email', f"{username}@migrated.local"),
+                                    hashed_password=password
+                                )
+                            else:
+                                # Password is plain text, use normal registration
+                                register_user(
+                                    username=username,
+                                    name=user_data.get('name', username),
+                                    email=user_data.get('email', f"{username}@migrated.local"),
+                                    password=password
+                                )
             except Exception as e:
                 st.warning(f"Could not migrate users from YAML: {e}")
         
