@@ -1,6 +1,19 @@
 # Environment variables
 .env
 
+# Database files (SQLite)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+sanatanagpt.db
+
+# User authentication and data files (legacy)
+user_data.pkl
+users_config.yaml
+*.pkl
+*.yaml
+
 # Python
 __pycache__/
 *.py[cod]
@@ -164,10 +177,4 @@ celerybeat.pid
 dmypy.json
 
 # Pyre type checker
-.pyre/
-
-# User authentication and data files
-user_data.pkl
-users_config.yaml
-*.pkl
-*.yaml 
+.pyre/ 

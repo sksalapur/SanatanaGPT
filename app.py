@@ -18,6 +18,13 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email_validator import validate_email, EmailNotValidError
 
+# Import our new database functions
+from database import (
+    init_database, register_user, authenticate_user, get_user_by_username,
+    get_user_by_email, save_conversation, get_user_conversations,
+    delete_conversation, get_conversation_count, check_database_health
+)
+
 # PDF support
 try:
     from pypdf import PdfReader
@@ -28,71 +35,22 @@ except ImportError:
 # Load environment variables
 load_dotenv()
 
-# User data file
-USER_DATA_FILE = "user_data.pkl"
-USERS_CONFIG_FILE = "users_config.yaml"
+# Initialize database on startup
+try:
+    init_database()
+    if check_database_health():
+        pass  # Database is healthy
+    else:
+        st.error("Database initialization failed!")
+        st.stop()
+except Exception as e:
+    st.error(f"Database startup error: {e}")
+    st.stop()
 
-def load_user_data():
-    """Load user conversation data from file."""
-    try:
-        with open(USER_DATA_FILE, 'rb') as f:
-            return pickle.load(f)
-    except FileNotFoundError:
-        return {}
-    except Exception as e:
-        st.error(f"Error loading user data: {e}")
-        return {}
-
-def save_user_data(user_data):
-    """Save user conversation data to file."""
-    try:
-        with open(USER_DATA_FILE, 'wb') as f:
-            pickle.dump(user_data, f)
-        return True
-    except Exception as e:
-        st.error(f"Error saving user data: {e}")
-        return False
-
-def create_users_config():
-    """Create initial users configuration."""
-    # Try to load from YAML file first
-    try:
-        with open(USERS_CONFIG_FILE, 'r') as file:
-            config = yaml.safe_load(file)
-            if config is None:
-                config = {}
-    except FileNotFoundError:
-        config = {}
-    
-    # Ensure all required sections exist
-    if 'credentials' not in config:
-        config['credentials'] = {'usernames': {}}
-    if 'cookie' not in config:
-        config['cookie'] = {
-            'expiry_days': 30,
-            'key': 'sanatana_gpt_auth',
-            'name': 'sanatana_gpt_cookie'
-        }
-    if 'preauthorized' not in config:
-        config['preauthorized'] = {'emails': []}
-    
-    return config
-
-def load_users_config():
-    """Load users configuration from YAML file."""
-    return create_users_config()
-
-def save_users_config(config):
-    """Save users configuration to YAML file."""
-    try:
-        with open(USERS_CONFIG_FILE, 'w') as file:
-            yaml.safe_dump(config, file, default_flow_style=False)
-        return True
-    except Exception as e:
-        st.error(f"Error saving user configuration: {e}")
-        return False
-
+# Database-based user management functions (replacing old file-based ones)
 def register_new_user(username, name, email, password):
+    """Register a new user using the database."""
+    return register_user(username, name, email, password)
     """Register a new user and save to YAML file."""
     # Load current config
     config = load_users_config()
@@ -525,12 +483,26 @@ def create_new_conversation():
     """Create a new conversation."""
     st.session_state.conversation_counter += 1
     new_id = f"conv_{st.session_state.conversation_counter}"
+    
+    # Create conversation in session state
     st.session_state.conversations[new_id] = {
         'chat_history': [],
         'conversation_context': [],
-        'created_at': time.time()
+        'created_at': time.time(),
+        'updated_at': time.time()
     }
     st.session_state.current_conversation_id = new_id
+    
+    # Save to database immediately
+    user_id = st.session_state.get('user_id')
+    if user_id:
+        save_conversation(
+            user_id=user_id,
+            conversation_id=new_id,
+            chat_history=[],
+            conversation_context=[]
+        )
+    
     return new_id
 
 def update_current_conversation(chat_history, conversation_context):
@@ -538,39 +510,104 @@ def update_current_conversation(chat_history, conversation_context):
     if st.session_state.current_conversation_id is None:
         create_new_conversation()
     
+    # Update session state
     st.session_state.conversations[st.session_state.current_conversation_id]['chat_history'] = chat_history
     st.session_state.conversations[st.session_state.current_conversation_id]['conversation_context'] = conversation_context
+    st.session_state.conversations[st.session_state.current_conversation_id]['updated_at'] = time.time()
+    
+    # Save to database
+    user_id = st.session_state.get('user_id')
+    if user_id:
+        save_conversation(
+            user_id=user_id,
+            conversation_id=st.session_state.current_conversation_id,
+            chat_history=chat_history,
+            conversation_context=conversation_context
+        )
+
+def custom_login():
+    """Custom login form using database authentication."""
+    if 'authentication_status' not in st.session_state:
+        st.session_state.authentication_status = None
+    
+    if st.session_state.authentication_status is not True:
+        st.markdown("### 🔐 Login to SanatanaGPT")
+        
+        with st.form("login_form"):
+            username = st.text_input("Username", placeholder="Enter your username")
+            password = st.text_input("Password", type="password", placeholder="Enter your password")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                login_button = st.form_submit_button("🚪 Login", use_container_width=True, type="primary")
+            with col2:
+                # Add a forgot password placeholder (for future implementation)
+                st.caption("Forgot password? Contact support")
+        
+        if login_button:
+            if not username or not password:
+                st.error("Please enter both username and password")
+            else:
+                success, user_info = authenticate_user(username, password)
+                if success:
+                    # Set session state for successful login
+                    st.session_state.authentication_status = True
+                    st.session_state.username = user_info['username']
+                    st.session_state.name = user_info['name']
+                    st.session_state.user_email = user_info['email']
+                    st.session_state.user_id = user_info['id']
+                    st.success(f"Welcome back, {user_info['name']}!")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.session_state.authentication_status = False
+                    st.error("Invalid username or password")
+    
+    return st.session_state.authentication_status
+
+def custom_logout():
+    """Custom logout function."""
+    # Clear authentication session state
+    auth_keys = ['authentication_status', 'username', 'name', 'user_email', 'user_id']
+    for key in auth_keys:
+        if key in st.session_state:
+            del st.session_state[key]
+    
+    # Clear user-specific data
+    user_keys_to_clear = [
+        'conversations', 'current_conversation_id', 'conversation_counter', 
+        'user_question', 'pending_example'
+    ]
+    for key in user_keys_to_clear:
+        if key in st.session_state:
+            del st.session_state[key]
 
 def main():
-    """Main Streamlit application with user authentication."""
+    """Main Streamlit application with database-based authentication."""
     
-    # Create users config if it doesn't exist
-    config = create_users_config()
-    if not config:
-        st.error("Failed to load authentication configuration")
+    # Initialize database and check health
+    try:
+        init_database()
+        if not check_database_health():
+            st.error("Database is not accessible!")
+            st.stop()
+    except Exception as e:
+        st.error(f"Database error: {e}")
         st.stop()
     
-    # Create authenticator
-    authenticator = stauth.Authenticate(
-        config['credentials'],
-        config['cookie']['name'],
-        config['cookie']['key'],
-        config['cookie']['expiry_days']
-    )
+    # Handle authentication
+    authentication_status = custom_login()
     
-    # Login
-    authenticator.login(location='main')
-    
-    # Get authentication status from session state
+    # Get user info from session state
     name = st.session_state.get('name')
-    authentication_status = st.session_state.get('authentication_status')
     username = st.session_state.get('username')
+    user_id = st.session_state.get('user_id')
     
     # Clean up user-specific session state if not authenticated
     if authentication_status != True:
         user_keys_to_clear = [
             'conversations', 'current_conversation_id', 'conversation_counter', 
-            'user_question', 'pending_example', 'username'
+            'user_question', 'pending_example'
         ]
         for key in user_keys_to_clear:
             if key in st.session_state:
@@ -661,35 +698,27 @@ def main():
                         if not email_valid:
                             st.error(email_message)
                         else:
-                            # Check if username or email already exists
-                            config = load_users_config()
-                            if config and new_username in config['credentials']['usernames']:
+                            # Check if username or email already exists using database
+                            existing_user = get_user_by_username(new_username)
+                            existing_email = get_user_by_email(new_email)
+                            
+                            if existing_user:
                                 st.error("Username already exists")
-                            elif config:
-                                # Check if email already exists
-                                email_exists = False
-                                for user_data in config['credentials']['usernames'].values():
-                                    if user_data.get('email', '').lower() == new_email.lower():
-                                        email_exists = True
-                                        break
-                                
-                                if email_exists:
-                                    st.error("Email already registered")
-                                else:
-                                    # Generate and send OTP
-                                    otp = generate_otp()
-                                    success, message = send_otp_email(new_email, otp, new_name)
-                                    
-                                    if success:
-                                        # Store pending user data
-                                        store_pending_user(new_username, new_name, new_email, new_password, otp)
-                                        st.session_state.otp_verification_email = new_email
-                                        st.success("Verification code sent to your email!")
-                                        st.rerun()
-                                    else:
-                                        st.error(message)
+                            elif existing_email:
+                                st.error("Email already registered")
                             else:
-                                st.error("Error loading configuration")
+                                # Generate and send OTP
+                                otp = generate_otp()
+                                success, message = send_otp_email(new_email, otp, new_name)
+                                
+                                if success:
+                                    # Store pending user data
+                                    store_pending_user(new_username, new_name, new_email, new_password, otp)
+                                    st.session_state.otp_verification_email = new_email
+                                    st.success("Verification code sent to your email!")
+                                    st.rerun()
+                                else:
+                                    st.error(message)
         
     elif authentication_status == None:
         st.warning('Please enter your username and password')
@@ -779,64 +808,63 @@ def main():
                         if not email_valid:
                             st.error(email_message)
                         else:
-                            # Check if username or email already exists
-                            config = load_users_config()
-                            if config and new_username in config['credentials']['usernames']:
+                            # Check if username or email already exists using database
+                            existing_user = get_user_by_username(new_username)
+                            existing_email = get_user_by_email(new_email)
+                            
+                            if existing_user:
                                 st.error("Username already exists")
-                            elif config:
-                                # Check if email already exists
-                                email_exists = False
-                                for user_data in config['credentials']['usernames'].values():
-                                    if user_data.get('email', '').lower() == new_email.lower():
-                                        email_exists = True
-                                        break
-                                
-                                if email_exists:
-                                    st.error("Email already registered")
-                                else:
-                                    # Generate and send OTP
-                                    otp = generate_otp()
-                                    success, message = send_otp_email(new_email, otp, new_name)
-                                    
-                                    if success:
-                                        # Store pending user data
-                                        store_pending_user(new_username, new_name, new_email, new_password, otp)
-                                        st.session_state.otp_verification_email = new_email
-                                        st.success("Verification code sent to your email!")
-                                        st.rerun()
-                                    else:
-                                        st.error(message)
+                            elif existing_email:
+                                st.error("Email already registered")
                             else:
-                                st.error("Error loading configuration")
+                                # Generate and send OTP
+                                otp = generate_otp()
+                                success, message = send_otp_email(new_email, otp, new_name)
+                                
+                                if success:
+                                    # Store pending user data
+                                    store_pending_user(new_username, new_name, new_email, new_password, otp)
+                                    st.session_state.otp_verification_email = new_email
+                                    st.success("Verification code sent to your email!")
+                                    st.rerun()
+                                else:
+                                    st.error(message)
         
     elif authentication_status:
         # User is authenticated - show the main app
         
-        # Load user-specific data
-        user_data = load_user_data()
-        if username not in user_data:
-            user_data[username] = {
-                'conversations': {},
-                'current_conversation_id': None,
-                'conversation_counter': 0
-            }
+        # Load user-specific data from database
+        user_conversations = get_user_conversations(user_id)
         
         # Initialize session state with user-specific data
         st.session_state.setdefault('user_question', "")
-        st.session_state.conversations = user_data[username]['conversations']
-        st.session_state.current_conversation_id = user_data[username]['current_conversation_id']
-        st.session_state.conversation_counter = user_data[username]['conversation_counter']
-        st.session_state.setdefault('pending_example', None)
-        st.session_state.username = username
+        st.session_state.conversations = user_conversations
         
-        # Save user data function
+        # Set current conversation ID (most recent one or None)
+        if user_conversations and 'current_conversation_id' not in st.session_state:
+            # Set to most recently updated conversation
+            most_recent_conv_id = max(user_conversations.keys(), 
+                                    key=lambda k: user_conversations[k].get('updated_at', 0))
+            st.session_state.current_conversation_id = most_recent_conv_id
+        elif not user_conversations:
+            st.session_state.current_conversation_id = None
+        
+        # Get conversation counter from database
+        conversation_count = get_conversation_count(user_id)
+        st.session_state.conversation_counter = conversation_count
+        st.session_state.setdefault('pending_example', None)
+        
+        # Save user data function using database
         def save_current_user_data():
-            user_data[username] = {
-                'conversations': st.session_state.conversations,
-                'current_conversation_id': st.session_state.current_conversation_id,
-                'conversation_counter': st.session_state.conversation_counter
-            }
-            save_user_data(user_data)
+            # Save each conversation to database
+            for conv_id, conv_data in st.session_state.conversations.items():
+                save_conversation(
+                    user_id=user_id,
+                    conversation_id=conv_id,
+                    chat_history=conv_data.get('chat_history', []),
+                    conversation_context=conv_data.get('conversation_context', []),
+                    title=conv_data.get('title', None)
+                )
         
         # Header with logout
         col1, col2 = st.columns([3, 1])
@@ -849,27 +877,8 @@ def main():
                 # Save user data before logout
                 save_current_user_data()
                 
-                # Perform logout first
-                try:
-                    authenticator.logout(location='main')
-                except Exception as e:
-                    st.error(f"Logout error: {e}")
-                
-                # Clear ALL session state to ensure clean logout
-                keys_to_clear = [
-                    'conversations', 'current_conversation_id', 'conversation_counter', 
-                    'user_question', 'pending_example', 'username', 'pending_users', 
-                    'otp_verification_email', 'name', 'authentication_status'
-                ]
-                
-                for key in keys_to_clear:
-                    if key in st.session_state:
-                        del st.session_state[key]
-                
-                # Clear any remaining authentication-related keys
-                auth_keys = [k for k in st.session_state.keys() if 'auth' in k.lower() or 'login' in k.lower()]
-                for key in auth_keys:
-                    del st.session_state[key]
+                # Perform custom logout
+                custom_logout()
                 
                 # Show success message and force immediate refresh
                 st.success("✅ Logged out successfully!")
@@ -918,12 +927,8 @@ def main():
             # User info - protect against KeyError during logout
             st.markdown("---")
             st.markdown(f"**👤 Logged in as:** {name}")
-            try:
-                user_email = config['credentials']['usernames'][username]['email']
-                st.markdown(f"**📧 Email:** {user_email}")
-            except (KeyError, TypeError):
-                # Handle case where user data is being cleared during logout
-                st.markdown("**📧 Email:** Logging out...")
+            user_email = st.session_state.get('user_email', 'Unknown')
+            st.markdown(f"**📧 Email:** {user_email}")
             
             # Conversation management
             st.header("💬 Your Conversations")

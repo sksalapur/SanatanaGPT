@@ -5,6 +5,10 @@ python-dotenv>=1.0.0
 streamlit-authenticator
 pyyaml
 
+# Database support
+sqlalchemy>=1.4.0
+bcrypt>=4.0.0
+
 # Email functionality for OTP verification
 email-validator
 
