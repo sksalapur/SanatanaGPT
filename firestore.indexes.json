@@ -1,0 +1,17 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "scripture_chunks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "embedding",
+          "vectorConfig": {
+            "dimension": 768,
+            "flat": {}
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,182 +1,148 @@
-# 🕉️ SanatanaGPT - Hindu Scriptures Q&A System
+# 🕉️ SanatanaGPT
 
-An AI-powered question-answering system for Hindu scriptures, built with Streamlit and Google's Gemini AI. Ask questions about the Bhagavad Gita, Upanishads, Vedas, and other sacred texts in natural language.
+**Try it here: [sanatangpt-ee992.web.app](https://sanatangpt-ee992.web.app)**
 
-## ✨ Features
+**Your Personal Guide to Hindu Wisdom** — powered by Gemini AI + Firestore Vector Search.
 
-- 🤖 **AI-Powered Q&A**: Ask questions about Hindu scriptures in natural language
-- 📚 **Multiple Scripture Support**: Bhagavad Gita, Upanishads, Vedas, Puranas, and more
-- 💬 **Conversation Management**: Create, save, and manage multiple conversations
-- 🔗 **Shareable Links**: Generate links to share specific conversations
-- 👤 **User Authentication**: Secure registration and login with email OTP verification
-- 📊 **Source Citations**: See exact passages that answer your questions
-- 🎯 **Balanced Search**: Intelligent distribution across different texts
-- 📱 **Responsive Design**: Works on desktop and mobile devices
+SanatanaGPT is a full-stack RAG (Retrieval-Augmented Generation) application that lets users ask questions about Hindu scriptures. It retrieves relevant passages from vectorized scripture chunks and uses Google Gemini to generate contextual answers.
 
-## 🚀 Quick Start
+## Architecture
 
-### 1. Clone the Repository
-```bash
-git clone https://github.com/YOUR_USERNAME/SanatanaGPT.git
-cd SanatanaGPT
+```
+┌─────────────────┐      ┌──────────────────────────┐
+│   Next.js 16    │◄────►│   FastAPI + Uvicorn      │
+│   React 19      │      │   Google Gemini 2.5      │
+│   Firebase Auth │      │   Firestore Vector DB    │
+│   Firestore SDK │      │   Firebase Admin SDK     │
+└─────────────────┘      └──────────────────────────┘
+     Frontend                    Backend
+   (port 3000)                 (port 8000)
 ```
 
-### 2. Install Dependencies
+## Features
+
+- 🔐 **Google Auth** — Firebase Authentication with Google Sign-In
+- 💬 **AI Chat** — Conversational interface powered by Gemini 2.5 Flash
+- 📚 **Scripture Library** — Public catalog of uploaded scriptures with search/filter
+- 🔍 **RAG Pipeline** — Vector search over chunked scripture embeddings
+- 📋 **Scripture Requests** — Users can request new scriptures; admin approves/rejects
+- 🛡️ **Admin Panel** — Upload & vectorize scripture PDFs, manage requests
+- 📱 **Mobile Responsive** — Sidebar converts to drawer on small screens
+
+## Quick Start
+
+### Prerequisites
+
+- **Node.js** 18+ and npm
+- **Python** 3.10+
+- A **Firebase project** with Authentication and Firestore enabled
+- A **Gemini API key** from [Google AI Studio](https://aistudio.google.com/)
+
+### 1. Backend Setup
+
 ```bash
+cd backend
+python -m venv venv
+.\venv\Scripts\activate    # Windows
 pip install -r requirements.txt
 ```
 
-### 3. Set Up Environment Variables
-```bash
-cp env_example.txt .env
-```
-
-Edit `.env` and add your credentials:
+Create `backend/.env`:
 ```env
-# Google Gemini AI API Key (Required)
-GOOGLE_API_KEY=your_google_api_key_here
-
-# Gmail Configuration for Email OTP (Required for user registration)
-SMTP_SERVER=smtp.gmail.com
-SMTP_PORT=587
-SENDER_EMAIL=your.email@gmail.com
-SENDER_PASSWORD=your_16_character_app_password_here
+GEMINI_API_KEY="your-gemini-api-key"
+FIREBASE_STORAGE_BUCKET="your-project.firebasestorage.app"
+ADMIN_UID="your-firebase-admin-uid"
 ```
 
-### 4. Run the Application
+Place your Firebase service account key as `backend/serviceAccountKey.json`.
+
+Start the backend:
 ```bash
-streamlit run app.py
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-## 🔑 Getting API Keys
+### 2. Frontend Setup
 
-### Google Gemini AI API Key
-1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Sign in with your Google account
-3. Click "Create API Key"
-4. Copy the generated key to your `.env` file
-
-### Gmail App Password (for OTP emails)
-1. Enable 2-Factor Authentication on your Google account
-2. Go to [App Passwords](https://myaccount.google.com/apppasswords)
-3. Generate a new app password for "Mail"
-4. Use this 16-character password in your `.env` file
-
-## 📁 Project Structure
-
-```
-SanatanaGPT/
-├── app.py                      # Main Streamlit application
-├── requirements.txt            # Python dependencies
-├── env_example.txt            # Environment variables template
-├── users_config.yaml          # User authentication config
-├── .gitignore                 # Git ignore rules
-├── README.md                  # This file
-├── hindu_texts/               # Scripture text files
-│   ├── bhagavad_gita.txt
-│   ├── upanishads.txt
-│   └── ...
-├── docs/                      # Documentation
-│   ├── API_GUIDE.md          # API usage guide
-│   └── INSTALLATION.md       # Detailed installation guide
-├── config/                    # Configuration files
-│   ├── secrets_template.toml # Streamlit secrets template
-│   └── .streamlit/
-│       └── config.toml       # Streamlit configuration
-└── .devcontainer/            # VS Code dev container config
-```
-
-## 📚 Adding Scripture Texts
-
-1. Place your Hindu scripture text files in the `hindu_texts/` directory
-2. Use `.txt` format with UTF-8 encoding
-3. Name files descriptively (e.g., `bhagavad_gita.txt`, `upanishads.txt`)
-
-## ☁️ Deployment
-
-### Streamlit Cloud
-1. Fork this repository to your GitHub
-2. Go to [share.streamlit.io](https://share.streamlit.io)
-3. Connect your GitHub account and select your repository
-4. Set main file as `app.py`
-5. Add your environment variables in App Settings → Secrets:
-   ```toml
-   GOOGLE_API_KEY = "your_api_key_here"
-   SENDER_EMAIL = "your.email@gmail.com"
-   SENDER_PASSWORD = "your_app_password"
-   ```
-
-### Local Development
 ```bash
-streamlit run app.py
+cd frontend
+npm install
 ```
 
-## 🔧 Configuration
+Create `frontend/.env.local`:
+```env
+NEXT_PUBLIC_FIREBASE_API_KEY="your-firebase-api-key"
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="your-project.firebaseapp.com"
+NEXT_PUBLIC_FIREBASE_PROJECT_ID="your-project-id"
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="your-project.firebasestorage.app"
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="your-sender-id"
+NEXT_PUBLIC_FIREBASE_APP_ID="your-app-id"
+NEXT_PUBLIC_ADMIN_UID="your-firebase-admin-uid"
+```
 
-### Streamlit Configuration
-The app includes optimized Streamlit settings in `config/.streamlit/config.toml`:
-- Wide layout mode
-- Dark theme
-- Optimized caching
-- Performance improvements
+Start the frontend:
+```bash
+npm run dev
+```
 
-### User Authentication
-- File-based user storage using `users_config.yaml`
-- Email OTP verification for new registrations
-- Secure password hashing with bcrypt
-- Session-based authentication
+### 3. Open in Browser
 
-## 🛠️ Development
+Navigate to `http://localhost:3000`
 
-### Requirements
-- Python 3.8+
-- Streamlit
-- Google Generative AI
-- Streamlit Authenticator
-- Other dependencies in `requirements.txt`
+## Environment Variable Checklist
 
-### Key Components
-- **Authentication**: User registration, login, OTP verification
-- **Text Processing**: Scripture text loading and chunking
-- **AI Integration**: Google Gemini API for Q&A
-- **Conversation Management**: Save, load, and share conversations
-- **UI/UX**: Responsive Streamlit interface
+### Backend (`backend/.env`)
 
-## 📖 Usage
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GEMINI_API_KEY` | ✅ | Google Gemini API key for AI generation and embeddings |
+| `FIREBASE_STORAGE_BUCKET` | ✅ | Firebase Storage bucket URL (e.g. `project.firebasestorage.app`) |
+| `ADMIN_UID` | ✅ | Firebase UID of the admin user |
+| `FIREBASE_CREDENTIALS` | ⬜ | Path to service account JSON (default: `serviceAccountKey.json`) |
 
-1. **Register/Login**: Create an account or log in with existing credentials
-2. **Ask Questions**: Type your question about Hindu scriptures
-3. **Get Answers**: Receive AI-generated answers with source citations
-4. **Manage Conversations**: Create, rename, and organize your conversations
-5. **Share**: Generate shareable links for specific conversations
+### Frontend (`frontend/.env.local`)
 
-## 🤝 Contributing
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | ✅ | Firebase Web API key |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | ✅ | Firebase Auth domain |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | ✅ | Firebase project ID |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | ✅ | Firebase Storage bucket |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | ✅ | Firebase messaging sender ID |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | ✅ | Firebase app ID |
+| `NEXT_PUBLIC_ADMIN_UID` | ✅ | Must match `ADMIN_UID` in backend |
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+## Firestore Collections
 
-## 📄 License
+| Collection | Purpose |
+|------------|---------|
+| `users/{uid}` | User profiles synced from Firebase Auth |
+| `users/{uid}/conversations/{id}` | Chat conversations |
+| `users/{uid}/conversations/{id}/messages/{id}` | Chat messages |
+| `scriptures/{id}` | Uploaded scripture metadata |
+| `scripture_chunks/{id}` | Vectorized scripture text chunks with embeddings |
+| `scripture_requests/{id}` | User-submitted scripture requests |
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## API Endpoints
 
-## 🙏 Acknowledgments
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/health` | ❌ | Health check |
+| GET | `/api/scriptures/` | ❌ | List all scriptures (public) |
+| GET | `/api/scriptures/{id}/download` | ❌ | Download scripture PDF |
+| PUT | `/api/scriptures/{id}` | 🛡️ | Update scripture metadata (admin) |
+| DELETE | `/api/scriptures/{id}` | 🛡️ | Delete scripture + chunks (admin) |
+| POST | `/api/users/sync` | ✅ | Sync Firebase user profile |
+| GET | `/api/conversations` | ✅ | List user's conversations |
+| POST | `/api/conversations` | ✅ | Create new conversation |
+| DELETE | `/api/conversations/{id}` | ✅ | Delete conversation |
+| POST | `/api/chat/{convId}` | ✅ | Send message, get AI response |
+| POST | `/api/requests/` | ✅ | Submit scripture request |
+| GET | `/api/requests/` | ✅ | List own requests |
+| GET | `/api/requests/all` | 🛡️ | List all pending (admin) |
+| PATCH | `/api/requests/{id}/approve` | 🛡️ | Approve request (admin) |
+| PATCH | `/api/requests/{id}/reject` | 🛡️ | Reject request (admin) |
+| POST | `/api/admin/scriptures` | 🛡️ | Upload & vectorize scripture (admin) |
 
-- **Hindu Scriptures**: Ancient wisdom texts that inspire this project
-- **Google Gemini AI**: Powerful AI capabilities for understanding and answering questions
-- **Streamlit**: Amazing framework for building data applications
-- **Open Source Community**: For the tools and libraries that make this possible
+## License
 
-## 📞 Support
-
-For support, please:
-1. Check the [Installation Guide](docs/INSTALLATION.md)
-2. Review the [API Guide](docs/API_GUIDE.md)
-3. Create an issue on GitHub
-4. Include error messages and system information
-
----
-
-*🕉️ May this tool help you explore the profound wisdom of Hindu scriptures! 🕉️* 
+MIT

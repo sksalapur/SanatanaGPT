@@ -1,0 +1,8 @@
+google-generativeai
+firebase-admin
+google-cloud-firestore
+google-cloud-storage
+pymupdf
+langchain-text-splitters
+python-dotenv
+sentence-transformers

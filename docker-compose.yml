@@ -1,0 +1,13 @@
+version: '3.8'
+services:
+  backend:
+    build: 
+      context: ./backend
+    container_name: sanatanagpt-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      - FIREBASE_CREDENTIALS=serviceAccountKey.json
+    restart: unless-stopped

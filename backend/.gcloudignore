@@ -1,0 +1,10 @@
+# Ignore common build artifacts and virtual environments
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+serviceAccountKey.json
+.git/
+.gitignore
+.dockerignore
