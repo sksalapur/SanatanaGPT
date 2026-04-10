@@ -1,7 +1,7 @@
 ---
 title: SanatanaGPT API
 emoji: 🕉️
-colorFrom: orange
+colorFrom: red
 colorTo: red
 sdk: docker
 app_port: 8080
