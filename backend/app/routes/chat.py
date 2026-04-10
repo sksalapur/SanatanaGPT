@@ -109,9 +109,9 @@ async def background_generate_title(uid: str, convId: str, db, first_message: st
                     {
                         "role": "system",
                         "content": (
-                            "You are a title generator. Generate a short, meaningful title "
-                            "(3-6 words max) for a chat conversation based on the first user "
-                            "message. Respond with ONLY the title, no quotes, no punctuation at the end."
+                            "You are a chat title generator. Create a concise title of "
+                            "3 to 4 words MAXIMUM for a conversation based on the user's question. "
+                            "Respond with ONLY the title. No quotes, no punctuation, no explanation."
                         )
                     },
                     {"role": "user", "content": first_message}
