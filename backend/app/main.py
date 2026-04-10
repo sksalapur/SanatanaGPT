@@ -8,13 +8,19 @@ from firebase_admin import credentials
 # Initialize Firebase before routing starts
 try:
     if not firebase_admin._apps:
-        # Tries to use serviceAccountKey.json locally, or falls back to App Default Credentials in Cloud Run
-        try:
-            cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS)
+        json_env = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON")
+        if json_env:
+            import json
+            cred_dict = json.loads(json_env)
+            cred = credentials.Certificate(cred_dict)
             firebase_admin.initialize_app(cred, {'storageBucket': "sanatangpt-ee992.firebasestorage.app"})
-        except Exception:
-            # Fallback for Cloud Run when serviceAccountKey is ignored by docker
-            firebase_admin.initialize_app(options={'storageBucket': "sanatangpt-ee992.firebasestorage.app"})
+        else:
+            try:
+                cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS)
+                firebase_admin.initialize_app(cred, {'storageBucket': "sanatangpt-ee992.firebasestorage.app"})
+            except Exception:
+                # Fallback for Cloud Run when serviceAccountKey is ignored by docker
+                firebase_admin.initialize_app(options={'storageBucket': "sanatangpt-ee992.firebasestorage.app"})
 except Exception as e:
     print(f"Firebase Init Error: {e}")
 
