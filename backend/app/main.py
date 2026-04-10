@@ -50,6 +50,10 @@ app.include_router(scriptures.router)
 app.include_router(requests.router)
 app.include_router(admin.router)
 
+@app.get("/")
+def read_root():
+    return {"message": "SanatanaGPT API is running. Access /docs for Swagger UI."}
+
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
