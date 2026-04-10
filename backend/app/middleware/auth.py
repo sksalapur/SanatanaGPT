@@ -5,23 +5,10 @@ import firebase_admin
 from firebase_admin import credentials, auth
 from app.core.config import settings
 
+from app.core.firebase import init_firebase
+
 # Initialize Firebase Admin
-if not firebase_admin._apps:
-    try:
-        # Local dev: use service account key file
-        cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS)
-        firebase_admin.initialize_app(cred, {
-            "storageBucket": settings.FIREBASE_STORAGE_BUCKET
-        })
-    except Exception:
-        try:
-            # Cloud Run: use Application Default Credentials
-            firebase_admin.initialize_app(options={
-                "storageBucket": settings.FIREBASE_STORAGE_BUCKET
-            })
-            print("Firebase initialized with Application Default Credentials")
-        except Exception as e:
-            print(f"Warning: Failed to initialize Firebase Admin: {e}")
+init_firebase()
 
 security = HTTPBearer()
 
