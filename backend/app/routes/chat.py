@@ -96,11 +96,43 @@ async def delete_conversation(convId: str, user: dict = Depends(get_current_user
     
     return {"status": "deleted", "deleted_messages": msg_count}
 
-def background_generate_title(uid: str, convId: str, db, first_message: str):
-    words = first_message.split()[:5]
-    title_stub = "Chat about: " + " ".join(words) + "..."
+async def background_generate_title(uid: str, convId: str, db, first_message: str):
+    """Generate a short, smart title using Groq, then save it to Firestore."""
+    title = None
+    
+    if settings.GROQ_API_KEY:
+        try:
+            from groq import AsyncGroq
+            groq_client = AsyncGroq(api_key=settings.GROQ_API_KEY)
+            resp = await groq_client.chat.completions.create(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a title generator. Generate a short, meaningful title "
+                            "(3-6 words max) for a chat conversation based on the first user "
+                            "message. Respond with ONLY the title, no quotes, no punctuation at the end."
+                        )
+                    },
+                    {"role": "user", "content": first_message}
+                ],
+                model="llama-3.3-70b-versatile",
+                temperature=0.5,
+                max_tokens=20,
+            )
+            title = resp.choices[0].message.content.strip()
+            print(f"[Title] Generated: '{title}'")
+        except Exception as e:
+            print(f"[Title] Groq failed, using fallback: {e}")
+    
+    # Fallback: clean word-truncation
+    if not title:
+        words = first_message.split()[:6]
+        title = " ".join(words) + ("..." if len(first_message.split()) > 6 else "")
+    
     conv_ref = db.collection("users").document(uid).collection("conversations").document(convId)
-    conv_ref.update({"title": title_stub, "updatedAt": utc_now()})
+    conv_ref.update({"title": title, "updatedAt": utc_now()})
+
 
 async def generate_ai_response(input_text: str, context_str: str, history: str, has_context: bool) -> str:
     """Call LLM and return full text response. Uses Groq (primary) with Gemini (fallback)."""
