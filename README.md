@@ -240,5 +240,5 @@ python ingest.py --file "gita.pdf" --title "Bhagavad Gita" --language "Sanskrit"
 </p>
 
 <p align="center">
-  Made with ❤️ by <a href="https://github.com/sksalapur">Sharanbasav Salapur</a>
+  Made with ❤️ by <a href="https://github.com/sksalapur">Shashank Salapur</a>
 </p>
