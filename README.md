@@ -42,7 +42,7 @@ SanatanaGPT is a **full-stack Retrieval-Augmented Generation (RAG)** application
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────────────────────────┐
 │                         USER                                     │
 │                          │                                       │
 │                          ▼                                       │
@@ -52,8 +52,8 @@ SanatanaGPT is a **full-stack Retrieval-Augmented Generation (RAG)** application
 │  │   Chat UI · Scripture Library · Admin  │                      │
 │  │   Deployed: Firebase Hosting           │                      │
 │  └──────────────┬─────────────────────────┘                      │
-│                 │ Authenticated API calls                         │
-│                 ▼                                                 │
+│                 │ Authenticated API calls                        │
+│                 ▼                                                │
 │  ┌────────────────────────────────────────┐                      │
 │  │   FastAPI Backend (Uvicorn)            │                      │
 │  │                                        │                      │
@@ -65,28 +65,28 @@ SanatanaGPT is a **full-stack Retrieval-Augmented Generation (RAG)** application
 │  │      → cosine distance < 0.85          │                      │
 │  │                                        │                      │
 │  │   3. Generate answer with context      │                      │
-│  │      → Groq LLaMA 3.3 70B (primary)   │                      │
+│  │      → Groq LLaMA 3.3 70B (primary)    │                      │
 │  │      → Gemini 2.5 Flash (fallback)     │                      │
 │  │      → Auto-retry with backoff         │                      │
 │  │                                        │                      │
-│  │   4. Auto-generate chat title           │                      │
+│  │   4. Auto-generate chat title          │                      │
 │  │      → Groq background task            │                      │
 │  │                                        │                      │
 │  │   Deployed: Hugging Face Spaces        │                      │
 │  │   (Docker container)                   │                      │
 │  └──────────────┬─────────────────────────┘                      │
-│                 │                                                 │
-│                 ▼                                                 │
+│                 │                                                │
+│                 ▼                                                │
 │  ┌────────────────────────────────────────┐                      │
 │  │   Firestore Vector Database            │                      │
 │  │                                        │                      │
-│  │   scripture_chunks collection           │                      │
+│  │   scripture_chunks collection          │                      │
 │  │   ├── text: "Arjuna said: O Krishna…"  │                      │
 │  │   ├── embedding: Vector([768 floats])  │                      │
 │  │   ├── metadata.title: "Bhagavad Gita"  │                      │
 │  │   └── chunkIndex: 42                   │                      │
 │  └────────────────────────────────────────┘                      │
-└─────────────────────────────────────────────────────────────────┘
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ### Why Firestore Vector Search instead of Pinecone/Weaviate?
