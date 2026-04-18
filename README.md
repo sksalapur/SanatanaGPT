@@ -1,148 +1,244 @@
-# 🕉️ SanatanaGPT
+<h1 align="center">🕉️ SanatanaGPT</h1>
 
-**Try it here: [sanatangpt-ee992.web.app](https://sanatangpt-ee992.web.app)**
+<p align="center">
+  <strong>Have questions about life, dharma, or the universe? Search no more.</strong>
+</p>
 
-**Your Personal Guide to Hindu Wisdom** — powered by Gemini AI + Firestore Vector Search.
+<p align="center">
+  <em>An AI that doesn't just answer — it cites the exact Bhagavad Gita verse, the precise Upanishad passage, the specific Ramayana chapter.</em>
+</p>
 
-SanatanaGPT is a full-stack RAG (Retrieval-Augmented Generation) application that lets users ask questions about Hindu scriptures. It retrieves relevant passages from vectorized scripture chunks and uses Google Gemini to generate contextual answers.
+<p align="center">
+  <a href="https://sanatangpt-ee992.web.app"><strong>🌐 Try it live → sanatangpt-ee992.web.app</strong></a>
+</p>
 
-## Architecture
+<p align="center">
+  <img src="https://img.shields.io/badge/Next.js-16-000000?logo=next.js&logoColor=white" />
+  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" />
+  <img src="https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white" />
+  <img src="https://img.shields.io/badge/Google_Gemini-2.5_Flash-4285F4?logo=google&logoColor=white" />
+  <img src="https://img.shields.io/badge/Firestore-Vector_Search-FFCA28?logo=firebase&logoColor=black" />
+  <img src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white" />
+  <img src="https://img.shields.io/badge/Status-Live_in_Production-brightgreen" />
+</p>
+
+---
+
+## 💡 What Is This?
+
+SanatanaGPT is a **full-stack Retrieval-Augmented Generation (RAG)** application that transforms how people learn from ancient Hindu scriptures. Instead of blindly generating answers like a generic chatbot, it:
+
+1. **Embeds your question** into a 768-dimensional vector using `all-mpnet-base-v2`
+2. **Searches vectorized scripture chunks** using Firestore's native `findNearest` cosine similarity
+3. **Retrieves the most relevant passages** with a configurable distance threshold (0.85)
+4. **Generates a grounded answer** using Groq LLaMA 3.3 70B (primary) or Google Gemini 2.5 Flash (fallback) — *always citing the source scripture*
+
+> **"What does the Gita say about overcoming fear?"**
+>
+> SanatanaGPT doesn't hallucinate an answer. It finds the exact verses from the Bhagavad Gita stored in your Firestore vector database, feeds them as context to the LLM, and produces an answer that *cites Chapter 2, Verse 14* — because the data is really there.
+
+---
+
+## 🏗️ Architecture
 
 ```
-┌─────────────────┐      ┌──────────────────────────┐
-│   Next.js 16    │◄────►│   FastAPI + Uvicorn      │
-│   React 19      │      │   Google Gemini 2.5      │
-│   Firebase Auth │      │   Firestore Vector DB    │
-│   Firestore SDK │      │   Firebase Admin SDK     │
-└─────────────────┘      └──────────────────────────┘
-     Frontend                    Backend
-   (port 3000)                 (port 8000)
+┌─────────────────────────────────────────────────────────────────┐
+│                         USER                                     │
+│                          │                                       │
+│                          ▼                                       │
+│  ┌────────────────────────────────────────┐                      │
+│  │   Next.js 16 Frontend                  │                      │
+│  │   React 19 + Firebase Auth             │                      │
+│  │   Chat UI · Scripture Library · Admin  │                      │
+│  │   Deployed: Firebase Hosting           │                      │
+│  └──────────────┬─────────────────────────┘                      │
+│                 │ Authenticated API calls                         │
+│                 ▼                                                 │
+│  ┌────────────────────────────────────────┐                      │
+│  │   FastAPI Backend (Uvicorn)            │                      │
+│  │                                        │                      │
+│  │   1. Embed query → 768-dim vector      │                      │
+│  │      (all-mpnet-base-v2, local)        │                      │
+│  │                                        │                      │
+│  │   2. findNearest() on Firestore        │                      │
+│  │      → top 5 scripture chunks          │                      │
+│  │      → cosine distance < 0.85          │                      │
+│  │                                        │                      │
+│  │   3. Generate answer with context      │                      │
+│  │      → Groq LLaMA 3.3 70B (primary)   │                      │
+│  │      → Gemini 2.5 Flash (fallback)     │                      │
+│  │      → Auto-retry with backoff         │                      │
+│  │                                        │                      │
+│  │   4. Auto-generate chat title           │                      │
+│  │      → Groq background task            │                      │
+│  │                                        │                      │
+│  │   Deployed: Hugging Face Spaces        │                      │
+│  │   (Docker container)                   │                      │
+│  └──────────────┬─────────────────────────┘                      │
+│                 │                                                 │
+│                 ▼                                                 │
+│  ┌────────────────────────────────────────┐                      │
+│  │   Firestore Vector Database            │                      │
+│  │                                        │                      │
+│  │   scripture_chunks collection           │                      │
+│  │   ├── text: "Arjuna said: O Krishna…"  │                      │
+│  │   ├── embedding: Vector([768 floats])  │                      │
+│  │   ├── metadata.title: "Bhagavad Gita"  │                      │
+│  │   └── chunkIndex: 42                   │                      │
+│  └────────────────────────────────────────┘                      │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-## Features
+### Why Firestore Vector Search instead of Pinecone/Weaviate?
 
-- 🔐 **Google Auth** — Firebase Authentication with Google Sign-In
-- 💬 **AI Chat** — Conversational interface powered by Gemini 2.5 Flash
-- 📚 **Scripture Library** — Public catalog of uploaded scriptures with search/filter
-- 🔍 **RAG Pipeline** — Vector search over chunked scripture embeddings
-- 📋 **Scripture Requests** — Users can request new scriptures; admin approves/rejects
-- 🛡️ **Admin Panel** — Upload & vectorize scripture PDFs, manage requests
-- 📱 **Mobile Responsive** — Sidebar converts to drawer on small screens
+Most RAG tutorials reach for purpose-built vector databases. SanatanaGPT deliberately uses **Firestore's native `findNearest`** vector search because:
+- **Zero infrastructure** — no separate vector DB to provision, scale, or pay for
+- **Single source of truth** — scripture metadata, chunks, embeddings, user data, and chat history all live in the same Firestore project
+- **Firebase-native auth** — Firestore security rules protect all data; no cross-service token management
+- **Production-ready at scale** — Firestore handles indexing, replication, and caching automatically
 
-## Quick Start
+---
+
+## ✨ Features
+
+### 💬 AI Chat with Source Citations
+- Conversational interface with full Markdown rendering
+- Every answer includes source citations (e.g., *(Bhagavad Gita)*)
+- If the question isn't about scriptures, the AI answers from general knowledge — **without apologizing or mentioning irrelevant context**
+- Conversation history maintained in Firestore with 4-message context window
+
+### 🧠 Smart Chat Naming
+- New conversations auto-generate 3-4 word titles using **Groq LLaMA 3.3 70B** as a background task
+- Fallback: clean word-truncation if Groq is unavailable
+
+### 📚 Scripture Library
+- Public catalog of all uploaded scriptures with search and filter
+- Scripture request system — users can request new additions; admin approves/rejects
+- Download original PDFs directly from Firebase Storage
+
+### 🛡️ Admin Panel
+- Upload PDF/TXT scriptures → auto-chunk with `RecursiveCharacterTextSplitter` (800 chars, 100 overlap) → embed with `all-mpnet-base-v2` → batch-write to Firestore with `Vector()` type
+- Manage scripture metadata, delete scriptures with cascading chunk cleanup
+- CLI ingestion tool (`admin/ingest.py`) for bulk local processing
+
+### 🔄 Dual-LLM Failover
+- **Primary**: Groq LLaMA 3.3 70B — fast, free-tier friendly, 3 retries with exponential backoff
+- **Fallback**: Google Gemini 2.5 Flash → Gemini 2.0 Flash cascade — 3 retries each
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology | Purpose |
+|-------|------------|---------|
+| **Frontend** | Next.js 16, React 19, TailwindCSS | SSR, responsive chat UI, sidebar navigation |
+| **Auth** | Firebase Auth (Google Sign-In) | Zero-friction user onboarding + admin role gating |
+| **Backend** | FastAPI + Uvicorn | Async Python API for RAG pipeline |
+| **Embeddings** | `all-mpnet-base-v2` (768-dim, local) | Query + document embedding without API costs |
+| **Vector DB** | Firestore `findNearest()` | Native cosine similarity search, zero infra overhead |
+| **Primary LLM** | Groq LLaMA 3.3 70B Versatile | Fast inference, 4096 token responses |
+| **Fallback LLM** | Google Gemini 2.5 Flash / 2.0 Flash | Redundancy when Groq is rate-limited |
+| **Text Splitting** | LangChain `RecursiveCharacterTextSplitter` | Semantic chunking for optimal retrieval |
+| **Containerization** | Docker + Docker Compose | Reproducible backend deployments |
+| **Frontend Hosting** | Firebase Hosting | CDN-backed, auto-SSL |
+| **Backend Hosting** | Hugging Face Spaces (Docker) | Free-tier GPU/CPU, persistent deployment |
+
+---
+
+## 📐 Project Structure
+
+```
+SanatanaGPT/
+├── frontend/                    # Next.js 16 + React 19
+│   ├── app/
+│   │   ├── page.tsx             # Landing → redirect to chat
+│   │   ├── chat/[id]/page.tsx   # Chat interface with RAG
+│   │   ├── login/page.tsx       # Google Sign-In
+│   │   ├── scriptures/page.tsx  # Public scripture library
+│   │   └── admin/page.tsx       # Admin panel (gated)
+│   ├── components/              # ChatLayout, Sidebar, ProtectedRoute
+│   ├── contexts/                # AuthContext (Firebase)
+│   └── firebase.ts              # Firebase client init
+│
+├── backend/                     # FastAPI + Uvicorn
+│   ├── app/
+│   │   ├── routes/
+│   │   │   ├── chat.py          # RAG pipeline: embed → search → generate
+│   │   │   ├── scriptures.py    # Public scripture CRUD
+│   │   │   ├── admin.py         # Admin operations (gated by UID)
+│   │   │   ├── requests.py      # Scripture request system
+│   │   │   └── users.py         # User profile sync
+│   │   ├── services/
+│   │   │   └── embedding.py     # Thread-safe SentenceTransformer singleton
+│   │   ├── middleware/
+│   │   │   └── auth.py          # Firebase ID token verification
+│   │   ├── core/
+│   │   │   ├── config.py        # Pydantic settings (env vars)
+│   │   │   └── firebase.py      # Firebase Admin SDK init
+│   │   └── db/
+│   │       └── firestore.py     # Firestore client + helpers
+│   ├── Dockerfile               # Production container
+│   └── requirements.txt
+│
+├── admin/
+│   └── ingest.py                # CLI: PDF → chunk → embed → Firestore
+│
+├── docker-compose.yml           # Full-stack local orchestration
+├── firebase.json                # Hosting + Firestore config
+└── firestore.rules              # Security rules
+```
+
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
+- Node.js 18+ · Python 3.10+ · Firebase project · Gemini API key
 
-- **Node.js** 18+ and npm
-- **Python** 3.10+
-- A **Firebase project** with Authentication and Firestore enabled
-- A **Gemini API key** from [Google AI Studio](https://aistudio.google.com/)
-
-### 1. Backend Setup
-
+### Backend
 ```bash
 cd backend
-python -m venv venv
-.\venv\Scripts\activate    # Windows
+python -m venv venv && .\venv\Scripts\activate
 pip install -r requirements.txt
+# Create backend/.env with GEMINI_API_KEY, FIREBASE_STORAGE_BUCKET, ADMIN_UID
+uvicorn app.main:app --port 8000 --reload
 ```
 
-Create `backend/.env`:
-```env
-GEMINI_API_KEY="your-gemini-api-key"
-FIREBASE_STORAGE_BUCKET="your-project.firebasestorage.app"
-ADMIN_UID="your-firebase-admin-uid"
-```
-
-Place your Firebase service account key as `backend/serviceAccountKey.json`.
-
-Start the backend:
+### Frontend
 ```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-### 2. Frontend Setup
-
-```bash
-cd frontend
-npm install
-```
-
-Create `frontend/.env.local`:
-```env
-NEXT_PUBLIC_FIREBASE_API_KEY="your-firebase-api-key"
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="your-project.firebaseapp.com"
-NEXT_PUBLIC_FIREBASE_PROJECT_ID="your-project-id"
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="your-project.firebasestorage.app"
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="your-sender-id"
-NEXT_PUBLIC_FIREBASE_APP_ID="your-app-id"
-NEXT_PUBLIC_ADMIN_UID="your-firebase-admin-uid"
-```
-
-Start the frontend:
-```bash
+cd frontend && npm install
+# Create frontend/.env.local with Firebase config
 npm run dev
 ```
 
-### 3. Open in Browser
+### Ingest a Scripture
+```bash
+cd admin
+python ingest.py --file "gita.pdf" --title "Bhagavad Gita" --language "Sanskrit"
+```
 
-Navigate to `http://localhost:3000`
+---
 
-## Environment Variable Checklist
-
-### Backend (`backend/.env`)
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `GEMINI_API_KEY` | ✅ | Google Gemini API key for AI generation and embeddings |
-| `FIREBASE_STORAGE_BUCKET` | ✅ | Firebase Storage bucket URL (e.g. `project.firebasestorage.app`) |
-| `ADMIN_UID` | ✅ | Firebase UID of the admin user |
-| `FIREBASE_CREDENTIALS` | ⬜ | Path to service account JSON (default: `serviceAccountKey.json`) |
-
-### Frontend (`frontend/.env.local`)
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `NEXT_PUBLIC_FIREBASE_API_KEY` | ✅ | Firebase Web API key |
-| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | ✅ | Firebase Auth domain |
-| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | ✅ | Firebase project ID |
-| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | ✅ | Firebase Storage bucket |
-| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | ✅ | Firebase messaging sender ID |
-| `NEXT_PUBLIC_FIREBASE_APP_ID` | ✅ | Firebase app ID |
-| `NEXT_PUBLIC_ADMIN_UID` | ✅ | Must match `ADMIN_UID` in backend |
-
-## Firestore Collections
-
-| Collection | Purpose |
-|------------|---------|
-| `users/{uid}` | User profiles synced from Firebase Auth |
-| `users/{uid}/conversations/{id}` | Chat conversations |
-| `users/{uid}/conversations/{id}/messages/{id}` | Chat messages |
-| `scriptures/{id}` | Uploaded scripture metadata |
-| `scripture_chunks/{id}` | Vectorized scripture text chunks with embeddings |
-| `scripture_requests/{id}` | User-submitted scripture requests |
-
-## API Endpoints
+## 🔗 API Endpoints
 
 | Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/health` | ❌ | Health check |
-| GET | `/api/scriptures/` | ❌ | List all scriptures (public) |
-| GET | `/api/scriptures/{id}/download` | ❌ | Download scripture PDF |
-| PUT | `/api/scriptures/{id}` | 🛡️ | Update scripture metadata (admin) |
-| DELETE | `/api/scriptures/{id}` | 🛡️ | Delete scripture + chunks (admin) |
-| POST | `/api/users/sync` | ✅ | Sync Firebase user profile |
-| GET | `/api/conversations` | ✅ | List user's conversations |
-| POST | `/api/conversations` | ✅ | Create new conversation |
-| DELETE | `/api/conversations/{id}` | ✅ | Delete conversation |
-| POST | `/api/chat/{convId}` | ✅ | Send message, get AI response |
-| POST | `/api/requests/` | ✅ | Submit scripture request |
-| GET | `/api/requests/` | ✅ | List own requests |
-| GET | `/api/requests/all` | 🛡️ | List all pending (admin) |
-| PATCH | `/api/requests/{id}/approve` | 🛡️ | Approve request (admin) |
-| PATCH | `/api/requests/{id}/reject` | 🛡️ | Reject request (admin) |
-| POST | `/api/admin/scriptures` | 🛡️ | Upload & vectorize scripture (admin) |
+|--------|------|:----:|-------------|
+| `GET` | `/health` | ❌ | Health check |
+| `GET` | `/api/scriptures/` | ❌ | List all scriptures |
+| `POST` | `/api/chat/{convId}` | ✅ | Send message → RAG → AI response with citations |
+| `GET` | `/api/conversations` | ✅ | List user's conversations |
+| `POST` | `/api/conversations` | ✅ | Create new conversation |
+| `POST` | `/api/requests/` | ✅ | Submit scripture request |
+| `POST` | `/api/admin/scriptures` | 🛡️ | Upload + vectorize scripture (admin) |
+| `DELETE` | `/api/admin/scriptures/{id}` | 🛡️ | Delete scripture + chunks (admin) |
 
-## License
+---
 
-MIT
+<p align="center">
+  <strong>Ancient wisdom, modern intelligence.</strong><br/>
+  <em>Ask anything. Get answers grounded in 5,000 years of scripture.</em>
+</p>
+
+<p align="center">
+  Made with ❤️ by <a href="https://github.com/sksalapur">Sharanbasav Salapur</a>
+</p>
