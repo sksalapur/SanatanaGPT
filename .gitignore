@@ -56,3 +56,5 @@ npm-debug.log*
 *.pkl
 # Firebase
 firestore.rules
+
+.firebase/
