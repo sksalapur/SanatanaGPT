@@ -54,3 +54,5 @@ npm-debug.log*
 .pytest_cache/
 .mypy_cache/
 *.pkl
+# Firebase
+firestore.rules
